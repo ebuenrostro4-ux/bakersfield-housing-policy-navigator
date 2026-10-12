@@ -1,0 +1,10 @@
+node_modules/
+.next/
+.env*
+!.env.example
+.DS_Store
+*.log
+.pnpm-store/
+prisma/*.db*
+*.tsbuildinfo
+test-results/
