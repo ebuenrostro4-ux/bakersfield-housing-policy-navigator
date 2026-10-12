@@ -4,6 +4,16 @@ An internal, student-developed housing policy research and coordination prototyp
 
 **Local demonstration only.** Seeded policies are fictional training examples. The app does not monitor all legislation, determine legal compliance, or replace City Attorney review. Public registration and developer access are not enabled.
 
+## Share a hosted demonstration
+
+[Deploy the team demo on Render](https://render.com/deploy?repo=https://github.com/ebuenrostro4-ux/bakersfield-housing-policy-navigator)
+
+Sign in to Render, review the Free web service, and deploy the supplied `render.yaml`. Once the service is Live, share its HTTPS address with teammates and choose Planner on the welcome screen. The host assigns the address; the startup script configures origin checks and secure cookies automatically.
+
+This is a public practice workspace with fictional data and shared demo accounts, including administrator access. Never enter private documents, real account credentials, or confidential information. The local Mac database and `.env` are not deployed. Live AI is disabled.
+
+Render's Free service sleeps after inactivity. First visits can take about a minute, and its temporary database resets on sleep, restart, or redeploy. Do not rely on it to preserve team work. Persistent storage and restricted access require a separate deployment configuration. See [Render's free-service limitations](https://render.com/docs/free). No paid services are requested by this blueprint. Hosting still requires your own Render account, and publication is only complete after Render reports Live.
+
 ## Run locally
 
 On this Mac, double-click **Start Navigator.command**, keep its Terminal window open, and visit [Navigator](http://127.0.0.1:3000). Choose **Planner**, then **Try a guided example**. The launcher uses installed Node.js or the available Codex runtime and preserves your saved work.

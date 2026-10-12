@@ -327,8 +327,9 @@ export default function Navigator() {
                 <strong>Demonstration workspace</strong>
                 <span className="banner-detail">
                   {" "}
-                  · Sample policies are fictional. Demo analysis does not use
-                  live AI.
+                  {process.env.NEXT_PUBLIC_SHARED_DEMO === "true"
+                    ? "· Public practice space. Use fictional information only. Everyone shares this workspace; edits may reset when the server restarts."
+                    : "· Sample policies are fictional. Demo analysis does not use live AI."}
                 </span>
               </>
             ) : (
@@ -594,6 +595,9 @@ function Login({
           {demoMode && (
             <div className="demo-login">
               <div className="divider-label">EXPLORE THE STUDENT DEMO</div>
+              {process.env.NEXT_PUBLIC_SHARED_DEMO === "true" && (
+                <p>Welcome, teammates! Choose Planner to explore. This is a public practice space: use fictional information only. Edits are shared and may reset after inactivity.</p>
+              )}
               <div className="demo-role-grid">
                 {[
                   ["staff", "Planner"],

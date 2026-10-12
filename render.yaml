@@ -1,0 +1,24 @@
+# Public, disposable student demo. No local database or .env is uploaded.
+services:
+  - type: web
+    name: bakersfield-housing-policy-navigator
+    runtime: node
+    plan: free
+    branch: main
+    autoDeployTrigger: off
+    buildCommand: npx --yes pnpm@11.25.0 install --frozen-lockfile && npx --yes pnpm@11.25.0 run build
+    startCommand: node scripts/start-hosted-demo.mjs
+    healthCheckPath: /api/session
+    envVars:
+      - key: NODE_VERSION
+        value: 24.14.0
+      - key: DATABASE_URL
+        value: file:/tmp/navigator-demo/demo.db
+      - key: DEMO_MODE
+        value: "true"
+      - key: AI_MODE
+        value: demo
+      - key: NEXT_PUBLIC_SHARED_DEMO
+        value: "true"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
