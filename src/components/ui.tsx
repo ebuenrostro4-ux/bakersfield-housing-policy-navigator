@@ -105,9 +105,9 @@ export function Modal({
       if (e.key === "Tab" && node) {
         const all = Array.from(
           node.querySelectorAll<HTMLElement>(
-            'button:not([disabled]),a[href],input,select,textarea,[tabindex="0"]',
+            'button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex="0"]',
           ),
-        );
+        ).filter((el) => el.getClientRects().length > 0);
         const first = all[0],
           last = all[all.length - 1];
         if (
@@ -155,6 +155,7 @@ export function Modal({
             onClick={onClose}
           >
             <X size={20} />
+            <span>Close</span>
           </button>
         </header>
         {children}

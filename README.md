@@ -16,7 +16,7 @@ Render's Free service sleeps after inactivity. First visits can take about a min
 
 ## Run locally
 
-On this Mac, double-click **Start Navigator.command**, keep its Terminal window open, and visit [Navigator](http://127.0.0.1:3000). Choose **Planner**, then **Try a guided example**. The launcher uses installed Node.js or the available Codex runtime and preserves your saved work.
+On this Mac, double-click **Start Navigator.command**, keep its Terminal window open, and visit [Navigator](http://127.0.0.1:3000). Choose **Planner**, then **Analyze a Policy → Try a guided example**. The launcher uses installed Node.js or the available Codex runtime and preserves your saved work.
 
 Use Node.js 22.12 or newer and npm (Node 24 is recommended). Run these commands from this directory:
 
@@ -45,10 +45,10 @@ Staff can submit and organize work. Reviewers and administrators can approve ver
 
 ## Features
 
-- Dashboard showing manually tracked policies, review needs, upcoming verified dates, and task workload.
-- Searchable legislation library with category, legislative status, relevance, and implementation information.
-- Policy analyzer for pasted text and supported document uploads, with structured findings and source passages.
-- Policy version comparison and preliminary procedure gap comparison.
+- Simple Home page with three actions, a compact status summary, policies needing attention, and upcoming tasks.
+- Searchable Policies page with category filtering and optional legal-status, relevance, and review filters.
+- Guided policy analyzer: choose an existing policy or upload a document, then request a plain-language explanation with supporting passages. Pasted text and additional fields remain under More Options.
+- Policy version comparison, preliminary procedure gap comparison, and review history under More Tools.
 - Human review and correction of draft analysis, source verification controls, and audit history.
 - Department assignments, task notes, progress tracking, supporting documents, and explicit due-date types.
 - Internal session authentication and staff, reviewer, and administrator permissions.

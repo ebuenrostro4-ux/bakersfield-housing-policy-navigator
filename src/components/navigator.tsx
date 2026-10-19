@@ -64,48 +64,34 @@ type View =
   | "tracker"
   | "gaps"
   | "compare"
-  | "settings";
+  | "settings"
+  | "help";
 const navigation = [
   { id: "dashboard", label: "Home", icon: LayoutDashboard, path: "/" },
-  {
-    id: "library",
-    label: "Legislation library",
-    icon: Library,
-    path: "/library",
-  },
+  { id: "library", label: "Policies", icon: Library, path: "/library" },
   {
     id: "analyzer",
-    label: "Understand a policy",
+    label: "Analyze a Policy",
     icon: Sparkles,
     path: "/analyzer",
   },
-  {
-    id: "tracker",
-    label: "Tasks & implementation",
-    icon: ListChecks,
-    path: "/tracker",
-  },
-  {
-    id: "gaps",
-    label: "Check City procedures",
-    icon: ScanSearch,
-    path: "/gaps",
-  },
-  {
-    id: "compare",
-    label: "Compare policy versions",
-    icon: GitCompareArrows,
-    path: "/compare",
-  },
+  { id: "tracker", label: "Tasks", icon: ListChecks, path: "/tracker" },
+  { id: "help", label: "Help", icon: CircleHelp, path: "/help" },
+];
+const advancedNavigation = [
+  { id: "gaps", label: "Check City Procedures", path: "/gaps" },
+  { id: "compare", label: "Compare Versions", path: "/compare" },
+  { id: "settings", label: "Recent Activity", path: "/settings" },
 ];
 const pageNames: Record<View, string> = {
-  dashboard: "Workspace overview",
-  library: "Legislation library",
-  analyzer: "AI policy analyzer",
-  tracker: "Implementation tracker",
-  gaps: "Policy gap analysis",
-  compare: "Policy change comparison",
-  settings: "People & activity",
+  dashboard: "Home",
+  library: "Policies",
+  analyzer: "Understand a Policy",
+  tracker: "Tasks",
+  gaps: "Check City Procedures",
+  compare: "Compare Versions",
+  settings: "Recent Activity",
+  help: "Help",
 };
 async function request<T>(
   url: string,
@@ -140,8 +126,9 @@ function exportFile(filename: string, content: string, type = "text/plain") {
 export default function Navigator() {
   const pathname = usePathname();
   const router = useRouter();
-  const view = (navigation.find((n) => n.path === pathname)?.id ||
-    (pathname === "/settings" ? "settings" : "dashboard")) as View;
+  const view = ([...navigation, ...advancedNavigation].find(
+    (n) => n.path === pathname,
+  )?.id || "dashboard") as View;
   const [data, setData] = useState<Workspace | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
@@ -181,6 +168,36 @@ export default function Navigator() {
       return () => clearTimeout(t);
     }
   }, [toast]);
+  useEffect(() => {
+    if (!mobile) return;
+    const previous = document.activeElement as HTMLElement;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const sidebar = document.getElementById("primary-sidebar");
+    sidebar?.querySelector<HTMLButtonElement>(".sidebar-close")?.focus();
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobile(false);
+      if (event.key !== "Tab" || !sidebar) return;
+      const controls = Array.from(
+        sidebar.querySelectorAll<HTMLElement>("a[href], button, summary"),
+      ).filter((el) => el.getClientRects().length > 0);
+      const first = controls[0],
+        last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", keydown);
+    return () => {
+      document.removeEventListener("keydown", keydown);
+      document.body.style.overflow = overflow;
+      previous?.focus();
+    };
+  }, [mobile]);
   const notify = (message: string) => {
     setToast(message);
     setError("");
@@ -209,15 +226,26 @@ export default function Navigator() {
         }}
       />
     );
-  const pending = data.policies.filter(
-    (p) => p.verification !== "Verified",
-  ).length;
   return (
     <div className="app-shell">
       <a href="#main-content" className="skip-link">
         Skip to content
       </a>
-      <aside className={`sidebar ${mobile ? "open" : ""}`}>
+      {mobile && (
+        <button
+          className="nav-scrim"
+          aria-label="Close navigation"
+          onClick={() => setMobile(false)}
+        />
+      )}
+      <aside id="primary-sidebar" className={`sidebar ${mobile ? "open" : ""}`}>
+        <button
+          className="btn secondary sidebar-close"
+          onClick={() => setMobile(false)}
+        >
+          <X size={20} />
+          Close Menu
+        </button>
         <Link
           href="/"
           className="brand-link"
@@ -229,47 +257,43 @@ export default function Navigator() {
           <span className="workspace-dot" />
           INTERNAL CITY WORKSPACE
         </div>
-        <div className="nav-label">WORKSPACE</div>
-        <nav>
+        <nav aria-label="Main navigation">
           {navigation.map((n) => (
             <Link
               key={n.id}
               href={n.path}
               onClick={() => setMobile(false)}
+              aria-current={view === n.id ? "page" : undefined}
               className={`nav-item ${view === n.id ? "active" : ""}`}
             >
               <n.icon size={19} />
               <span>{n.label}</span>
-              {n.id === "library" && <b>{data.policies.length}</b>}
             </Link>
           ))}
         </nav>
+        <details
+          className="sidebar-more"
+          key={view}
+          open={advancedNavigation.some((n) => n.id === view) || undefined}
+        >
+          <summary>More Tools</summary>
+          <nav aria-label="More tools">
+            {advancedNavigation.map((n) => (
+              <Link
+                key={n.id}
+                href={n.path}
+                onClick={() => setMobile(false)}
+                aria-current={view === n.id ? "page" : undefined}
+                className={`nav-item ${view === n.id ? "active" : ""}`}
+              >
+                {n.id === "settings" && data.user.role === "ADMIN"
+                  ? "People & Recent Activity"
+                  : n.label}
+              </Link>
+            ))}
+          </nav>
+        </details>
         <div className="sidebar-bottom">
-          <div className="sidebar-note">
-            <ShieldCheck size={19} />
-            <strong>People make the decisions.</strong>
-            <p>
-              AI assists with research.
-              <br />
-              City staff review and verify.
-            </p>
-          </div>
-          <Link
-            className={`nav-item ${view === "settings" ? "active" : ""}`}
-            href="/settings"
-          >
-            <Settings2 size={19} />
-            <span>
-              {data.user.role === "ADMIN"
-                ? "People & activity"
-                : "Review activity"}
-            </span>
-          </Link>
-          <button className="nav-item" onClick={() => setHelp(true)}>
-            <CircleHelp size={19} />
-            <span>Quick start guide</span>
-            <ArrowUpRight size={14} />
-          </button>
           <div className="profile">
             <span className="avatar">
               {data.user.name
@@ -292,19 +316,23 @@ export default function Navigator() {
               }}
             >
               <LogOut size={16} />
+              <span>Sign out</span>
             </button>
           </div>
         </div>
       </aside>
-      <div className="workspace">
+      <div className="workspace" inert={mobile || undefined}>
         <header className="topbar">
           <div className="breadcrumb">
             <button
-              className="icon-btn mobile-menu"
-              aria-label="Open navigation"
+              className="btn secondary mobile-menu"
+              aria-label={mobile ? "Close navigation" : "Open navigation"}
+              aria-expanded={mobile}
+              aria-controls="primary-sidebar"
               onClick={() => setMobile(!mobile)}
             >
               <Menu size={20} />
+              <span>Menu</span>
             </button>
             <Building2 size={16} />
             <span>City of Bakersfield</span>
@@ -362,12 +390,7 @@ export default function Navigator() {
             </div>
           )}
           {view === "dashboard" && (
-            <Dashboard
-              data={data}
-              onSelect={setSelected}
-              onTask={setTask}
-              onAdd={() => setAddPolicy(true)}
-            />
+            <Dashboard data={data} onSelect={setSelected} onTask={setTask} />
           )}
           {view === "library" && (
             <LibraryView
@@ -403,6 +426,7 @@ export default function Navigator() {
             />
           )}
           {view === "settings" && <Settings data={data} saved={saved} />}
+          {view === "help" && <HelpView mode={data.mode} />}
           <footer className="page-footer">
             <span>
               BAKERSFIELD <i /> HOUSING POLICY NAVIGATOR
@@ -596,7 +620,11 @@ function Login({
             <div className="demo-login">
               <div className="divider-label">EXPLORE THE STUDENT DEMO</div>
               {process.env.NEXT_PUBLIC_SHARED_DEMO === "true" && (
-                <p>Welcome, teammates! Choose Planner to explore. This is a public practice space: use fictional information only. Edits are shared and may reset after inactivity.</p>
+                <p>
+                  Welcome, teammates! Choose Planner to explore. This is a
+                  public practice space: use fictional information only. Edits
+                  are shared and may reset after inactivity.
+                </p>
               )}
               <div className="demo-role-grid">
                 {[
@@ -753,386 +781,221 @@ function Heading({
     </div>
   );
 }
+function HelpView({ mode }: { mode: "demo" | "live" }) {
+  return (
+    <>
+      <Heading
+        eyebrow="HELP"
+        title="Start here."
+        description="Choose what you want to do. We’ll guide you from there."
+      />
+      <section className="simple-section help-content">
+        <h2>Three simple ways to get started</h2>
+        <ol className="help-steps">
+          <li>
+            <h3>Find a policy</h3>
+            <p>
+              Open Policies, search by name, and choose View Policy to see its
+              explanation, status, dates, and tasks.
+            </p>
+            <Link className="text-link" href="/library">
+              View Policies
+            </Link>
+          </li>
+          <li>
+            <h3>Understand a document</h3>
+            <p>
+              Choose an existing policy or upload a PDF or text file. Select
+              Explain This Policy, then open a supporting passage to check the
+              source.
+            </p>
+            <Link className="text-link" href="/analyzer">
+              Analyze a Policy
+            </Link>
+          </li>
+          <li>
+            <h3>Keep track of work</h3>
+            <p>
+              Open Tasks to see what needs to happen next. Open a task to add
+              notes, assign someone, or update its progress.
+            </p>
+            <Link className="text-link" href="/tracker">
+              View Tasks
+            </Link>
+          </li>
+        </ol>
+        <GettingStarted mode={mode} />
+        <details className="simple-disclosure">
+          <summary>What do the statuses mean?</summary>
+          <p>
+            Not Reviewed: no review has started. Under Review: someone is
+            checking the policy. Action Required: there is work to do.
+            Completed: the planned work is finished.
+          </p>
+          <p>
+            Needs Verification means the information has not been confirmed from
+            an official source. A review status is separate from whether a law
+            has passed.
+          </p>
+        </details>
+        <details className="simple-disclosure">
+          <summary>Where are the other tools?</summary>
+          <p>
+            Open a policy and expand More Tools to compare versions, check City
+            procedures, or see review history. You can also find these under
+            More Tools in the menu. Administrators manage accounts in People &
+            Recent Activity.
+          </p>
+        </details>
+        <p className="muted">
+          AI explanations need human review. Sample policies are fictional. Task
+          target dates are not automatically legal deadlines.
+        </p>
+      </section>
+    </>
+  );
+}
+function PolicySummary({
+  policy,
+  onSelect,
+}: {
+  policy: Policy;
+  onSelect: (p: Policy) => void;
+}) {
+  return (
+    <article className="simple-policy">
+      <div>
+        <h3>{policy.title}</h3>
+        <p>{policy.category}</p>
+        <p className="simple-status">{policy.implementationStatus}</p>
+      </div>
+      <button
+        className="btn secondary"
+        aria-label={`View Policy: ${policy.title}`}
+        onClick={() => onSelect(policy)}
+      >
+        View Policy
+      </button>
+    </article>
+  );
+}
 function Dashboard({
   data,
   onSelect,
   onTask,
-  onAdd,
 }: {
   data: Workspace;
   onSelect: (p: Policy) => void;
   onTask: (t: Partial<Task>) => void;
-  onAdd: () => void;
 }) {
-  const review = data.policies.filter(
-    (p) =>
-      p.implementationStatus === "Not Reviewed" ||
-      p.implementationStatus === "Under Review",
+  const review = data.policies.filter((p) =>
+    ["Not Reviewed", "Under Review", "Action Required"].includes(
+      p.implementationStatus,
+    ),
   );
   const outstanding = data.tasks.filter((t) => t.status !== "Done");
-  const verified = data.policies.filter(
-    (p) =>
-      !p.sample &&
-      p.verification === "Verified" &&
-      p.deadline &&
-      new Date(p.deadline) >= new Date(),
-  );
-  const categories = CATEGORIES.map((category) => ({
-    category,
-    count: data.policies.filter((p) => p.category === category).length,
-  })).filter((c) => c.count);
-  const stages = STAGES.map((stage) => ({
-    stage,
-    count: data.policies.filter((p) => p.implementationStatus === stage).length,
-  }));
+  const upcoming = [...outstanding]
+    .sort((a, b) => (a.dueDate || "9999").localeCompare(b.dueDate || "9999"))
+    .slice(0, 3);
   return (
-    <>
+    <div className="simple-home">
       <Heading
-        eyebrow="YOUR POLICY WORKSPACE"
-        title="A clearer view of what’s next."
-        description="Stay informed. Connect the evidence. Move housing policy into action."
-      >
-        <button className="btn secondary" onClick={onAdd}>
-          <Plus size={17} />
-          Add policy
-        </button>
-        <Link href="/analyzer" className="btn primary">
-          <Sparkles size={17} />
-          Analyze a policy
-        </Link>
-      </Heading>
-      <GettingStarted mode={data.mode} />
-      <div className="stats-grid">
-        {[
-          {
-            label: "Tracked policies",
-            value: data.policies.length,
-            detail: "In your legislation library",
-            icon: Library,
-            link: "/library",
-            tone: "green",
-          },
-          {
-            label: "Awaiting staff review",
-            value: review.length,
-            detail: "Ready for a closer look",
-            icon: ScanSearch,
-            link: "/library?stage=review",
-            tone: "amber",
-          },
-          {
-            label: "Open implementation tasks",
-            value: outstanding.length,
-            detail: `Across ${new Set(outstanding.map((t) => t.department)).size} departments`,
-            icon: ListChecks,
-            link: "/tracker",
-            tone: "blue",
-          },
-          {
-            label: "Verified upcoming deadlines",
-            value: verified.length,
-            detail: verified.length
-              ? "Source-backed statutory dates"
-              : "No verified dates on file",
-            icon: CalendarDays,
-            link: "/library?verified=1",
-            tone: "neutral",
-          },
-        ].map((s) => (
-          <Link href={s.link} className="stat-card" key={s.label}>
-            <div className="stat-top">
-              <span>{s.label}</span>
-              <span className={`stat-icon ${s.tone}`}>
-                <s.icon size={18} />
-              </span>
-            </div>
-            <strong>{String(s.value).padStart(2, "0")}</strong>
-            <div className="stat-bottom">
-              <span>{s.detail}</span>
-              <ArrowUpRight size={16} />
-            </div>
-          </Link>
-        ))}
-      </div>
-      <section className="feature-banner">
-        <div className="feature-icon">
-          <Sparkles size={25} strokeWidth={1.5} />
-        </div>
-        <div>
-          <span className="eyebrow">
-            FROM COMPLEX LANGUAGE TO A CLEAR STARTING POINT
-          </span>
-          <h2>Understand the policy. See the next step.</h2>
-          <p>
-            Bring a document. Explore its meaning, supporting passages, and
-            questions for review.
-          </p>
-        </div>
-        <Link href="/analyzer" className="btn light-btn">
-          Open policy analyzer
-          <ArrowRight size={16} />
-        </Link>
-        <Skyline />
-      </section>
-      <div className="dashboard-grid">
-        <section className="panel review-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>
-                On your review radar{" "}
-                <span className="count-chip">{review.length}</span>
-              </h2>
-              <p>Policies that could shape your team’s next steps.</p>
-            </div>
-            <Link href="/library" className="text-link">
-              View library
-              <ArrowRight size={14} />
-            </Link>
-          </div>
-          <div className="policy-table-wrap">
-            <table className="policy-table">
-              <thead>
-                <tr>
-                  <th>POLICY / FOCUS AREA</th>
-                  <th>REVIEW STATUS</th>
-                  <th>DEPARTMENT</th>
-                  <th>
-                    <span className="sr-only">Open</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {review.slice(0, 4).map((p) => (
-                  <tr key={p.id}>
-                    <td>
-                      <button
-                        className="policy-title-button"
-                        onClick={() => onSelect(p)}
-                      >
-                        <span className="document-icon">
-                          <FileText size={18} />
-                        </span>
-                        <span>
-                          <strong>{p.title}</strong>
-                          <small>
-                            {p.billNumber} <i>·</i> {p.category}{" "}
-                            {p.sample && <b className="sample-label">SAMPLE</b>}
-                          </small>
-                        </span>
-                      </button>
-                    </td>
-                    <td>
-                      <StatusBadge value={p.implementationStatus} />
-                    </td>
-                    <td>
-                      <span className="department-label">{p.department}</span>
-                    </td>
-                    <td>
-                      <button
-                        className="icon-btn"
-                        aria-label={`Open ${p.title}`}
-                        onClick={() => onSelect(p)}
-                      >
-                        <ChevronRight size={17} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {!review.length && (
-              <Empty title="Your review queue is clear">
-                New policies will appear here when they need a review.
-              </Empty>
-            )}
-          </div>
-          <div className="table-note">
-            <ShieldCheck size={14} />
-            Sample records illustrate a workflow and do not describe actual
-            laws.
-          </div>
-        </section>
-        <section className="panel category-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Policy focus</h2>
-              <p>Your library, by housing category.</p>
-            </div>
-            <span className="mini-icon">
-              <SlidersHorizontal size={17} />
-            </span>
-          </div>
-          <div className="category-bars">
-            {categories.map((c, i) => (
-              <div className="category-row" key={c.category}>
-                <div>
-                  <span>
-                    <i
-                      style={{
-                        background: [
-                          "#28775d",
-                          "#80a08b",
-                          "#b1c5ac",
-                          "#cfaa6e",
-                          "#81949c",
-                          "#d3d7b0",
-                        ][i],
-                      }}
-                    />
-                    {c.category}
-                  </span>
-                  <b>{c.count}</b>
-                </div>
-                <div className="bar-track">
-                  <div
-                    style={{
-                      width: `${(c.count / Math.max(...categories.map((c) => c.count))) * 100}%`,
-                      background: [
-                        "#28775d",
-                        "#80a08b",
-                        "#b1c5ac",
-                        "#cfaa6e",
-                        "#81949c",
-                        "#d3d7b0",
-                      ][i],
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="category-bottom">
-            {data.policies.length} policies <i>·</i> {categories.length} focus
-            areas
-          </div>
-        </section>
-      </div>
-      <div className="dashboard-grid bottom-grid">
-        <section className="panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Next up for your team</h2>
-              <p>Staff-set targets to keep implementation moving.</p>
-            </div>
-            <Link href="/tracker" className="text-link">
-              All tasks
-              <ArrowRight size={14} />
-            </Link>
-          </div>
-          <div className="task-preview-list">
-            {outstanding.slice(0, 3).map((t) => (
-              <button
-                className="task-preview"
-                key={t.id}
-                onClick={() => onTask(t)}
+        eyebrow="BAKERSFIELD HOUSING POLICY NAVIGATOR"
+        title="Make housing policy easier to understand."
+        description="Review Bakersfield housing policies, understand complicated documents, and keep track of what needs to happen next."
+      />
+      <section className="home-actions" aria-labelledby="home-actions-title">
+        <h2 id="home-actions-title">What would you like to do?</h2>
+        <div className="home-action-grid">
+          {[
+            [
+              "View Policies",
+              "Browse housing policies and see their current status.",
+              "View Policies",
+              "/library",
+            ],
+            [
+              "Understand a Policy",
+              "Upload or select a policy and get a simple explanation.",
+              "Analyze a Policy",
+              "/analyzer",
+            ],
+            [
+              "View Tasks",
+              "See upcoming work, deadlines, and policy actions.",
+              "View Tasks",
+              "/tracker",
+            ],
+          ].map(([title, description, button, href], i) => (
+            <article className="home-action" key={href}>
+              <h3>{title}</h3>
+              <p>{description}</p>
+              <Link
+                className={`btn ${i === 0 ? "primary" : "secondary"}`}
+                href={href}
               >
-                <span
-                  className={`task-check ${t.status === "In progress" ? "progress" : ""}`}
-                >
-                  {t.status === "In progress" && <span />}
-                </span>
-                <div>
-                  <strong>{t.title}</strong>
-                  <span>
-                    {t.department}
-                    <i>·</i>
-                    {t.dateType}
-                  </span>
-                </div>
-                <span className="task-date">
-                  <Clock3 size={13} />
-                  {t.dueDate ? formatDate(t.dueDate, true) : "No target"}
-                </span>
-                <ChevronRight size={15} />
-              </button>
-            ))}
-            {!outstanding.length && (
-              <Empty title="No outstanding tasks">
-                Create a task from a policy or comparison report.
-              </Empty>
-            )}
-          </div>
-        </section>
-        <section className="panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Implementation at a glance</h2>
-              <p>From first review to completed action.</p>
-            </div>
-          </div>
-          <div className="stage-bar">
-            {stages
-              .filter((s) => s.count)
-              .map((s, i) => (
-                <div
-                  key={s.stage}
-                  title={`${s.stage}: ${s.count}`}
-                  style={{
-                    flex: s.count,
-                    background: ["#d7e4dc", "#b0cab8", "#d1b680", "#32765c"][
-                      STAGES.indexOf(s.stage)
-                    ],
-                  }}
-                />
-              ))}
-          </div>
-          <div className="stage-legend">
-            {stages.map((s, i) => (
-              <div key={s.stage}>
-                <span>
-                  <i
-                    style={{
-                      background: ["#d7e4dc", "#b0cab8", "#d1b680", "#32765c"][
-                        i
-                      ],
-                    }}
-                  />
-                  {s.stage}
-                </span>
-                <strong>{s.count}</strong>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
-      {verified.length > 0 && (
-        <section className="panel deadline-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Upcoming verified deadlines</h2>
-              <p>Official dates approved by a reviewer.</p>
-            </div>
-            <CalendarDays size={19} />
-          </div>
-          {verified.map((policy) => (
-            <button
-              className="deadline-row"
-              key={policy.id}
-              onClick={() => onSelect(policy)}
-            >
-              <span>
-                <strong>{policy.title}</strong>
-                <small>{policy.department}</small>
-              </span>
-              <span>{formatDate(policy.deadline, true)}</span>
-              <ChevronRight size={16} />
-            </button>
+                {button}
+              </Link>
+            </article>
           ))}
-        </section>
-      )}
-      <div className="sources-strip">
-        <span>START WITH THE SOURCE</span>
-        <OfficialLink url="https://leginfo.legislature.ca.gov/">
-          California Legislative Information
-        </OfficialLink>
-        <OfficialLink url="https://www.hcd.ca.gov/">
-          California HCD
-        </OfficialLink>
-        <OfficialLink url="https://www.bakersfieldcity.us/">
-          City of Bakersfield
-        </OfficialLink>
-      </div>
-    </>
+        </div>
+      </section>
+      <section
+        className="current-status"
+        aria-labelledby="current-status-title"
+      >
+        <h2 id="current-status-title">Current Status</h2>
+        <dl>
+          <div>
+            <dt>Policies</dt>
+            <dd>{data.policies.length}</dd>
+          </div>
+          <div>
+            <dt>Need Review</dt>
+            <dd>
+              {
+                data.policies.filter((p) =>
+                  ["Not Reviewed", "Under Review"].includes(
+                    p.implementationStatus,
+                  ),
+                ).length
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Open Tasks</dt>
+            <dd>{outstanding.length}</dd>
+          </div>
+        </dl>
+      </section>
+      <section className="simple-section" aria-labelledby="attention-title">
+        <h2 id="attention-title">Policies That Need Attention</h2>
+        {review.slice(0, 3).map((p) => (
+          <PolicySummary key={p.id} policy={p} onSelect={onSelect} />
+        ))}
+        {!review.length && <p>No policies need attention right now.</p>}
+        <Link className="text-link" href="/library">
+          View All Policies
+        </Link>
+      </section>
+      <section className="simple-section" aria-labelledby="upcoming-title">
+        <h2 id="upcoming-title">Upcoming Tasks</h2>
+        {upcoming.map((t) => (
+          <article className="simple-task" key={t.id}>
+            <button onClick={() => onTask(t)}>{t.title}</button>
+            <p>
+              {t.dueDate
+                ? `Due ${formatDate(t.dueDate, true)}`
+                : "No due date set"}
+            </p>
+          </article>
+        ))}
+        {!upcoming.length && <p>No open tasks right now.</p>}
+        <Link className="text-link" href="/tracker">
+          View All Tasks
+        </Link>
+      </section>
+    </div>
   );
 }
 function LibraryView({
@@ -1179,44 +1042,15 @@ function LibraryView({
   return (
     <>
       <Heading
-        eyebrow="RESEARCH & MONITORING"
-        title="Your legislation library."
-        description="One place for source documents, policy context, and review decisions."
+        eyebrow="HOUSING POLICIES"
+        title="Policies"
+        description="Find a policy and open it to see what it means and what needs to happen next."
       >
         <button className="btn primary" onClick={onAdd}>
           <Plus size={17} />
           Add policy
         </button>
       </Heading>
-      <div
-        className="status-overview"
-        aria-label="Policies by legislative status"
-      >
-        {STATUSES.map((value) => (
-          <button
-            key={value}
-            className={status === value ? "selected" : ""}
-            aria-pressed={status === value}
-            onClick={() => setStatus(status === value ? "all" : value)}
-          >
-            <strong>
-              {
-                data.policies.filter((p) => p.legislativeStatus === value)
-                  .length
-              }
-            </strong>
-            <span>{value}</span>
-          </button>
-        ))}
-      </div>
-      <div className="notice subtle">
-        <BookOpen size={19} />
-        <p>
-          Manual, source-led monitoring. Add a bill number and official source,
-          then submit its text for analysis. Legislative status remains
-          unverified until a reviewer checks the evidence.
-        </p>
-      </div>
       <section className="panel">
         <div className="filter-toolbar">
           <div className="search-input">
@@ -1228,103 +1062,101 @@ function LibraryView({
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <select
-            aria-label="Sort policies"
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-          >
-            <option value="recent">Recently updated</option>
-            <option value="title">Title A–Z</option>
-          </select>
+          <Field label="Policy Categories">
+            <select
+              aria-label="Filter category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              <option value="all">All categories</option>
+              {CATEGORIES.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+          </Field>
         </div>
-        <div className="filter-row">
-          <select
-            aria-label="Filter category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
+        <details className="simple-disclosure library-filters">
+          <summary>
+            More Filters & Sort
+            {[
+              status !== "all",
+              relevance !== "all",
+              stage !== "all",
+              verifiedOnly,
+            ].some(Boolean)
+              ? " · Filters applied"
+              : ""}
+          </summary>
+          <div className="form-grid">
+            <Field label="Legal status">
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
+                <option value="all">All legal statuses</option>
+                {STATUSES.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Relevance">
+              <select
+                value={relevance}
+                onChange={(e) => setRelevance(e.target.value)}
+              >
+                <option value="all">All relevance levels</option>
+                {["Relevant", "Not Relevant", "Needs Review"].map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Review status">
+              <select value={stage} onChange={(e) => setStage(e.target.value)}>
+                <option value="all">All review statuses</option>
+                <option value="review">Awaiting review</option>
+                {STAGES.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Sort policies">
+              <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                <option value="recent">Recently updated</option>
+                <option value="title">Title A–Z</option>
+              </select>
+            </Field>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={verifiedOnly}
+                onChange={(e) => setVerifiedOnly(e.target.checked)}
+              />
+              Verified only
+            </label>
+          </div>
+        </details>
+        <div className="policy-results">
+          <p role="status">
+            {filtered.length} {filtered.length === 1 ? "policy" : "policies"}
+          </p>
+          <button
+            className="text-link"
+            onClick={() => {
+              setSearch("");
+              setCategory("all");
+              setStatus("all");
+              setRelevance("all");
+              setStage("all");
+              setVerifiedOnly(false);
+              setSort("recent");
+            }}
           >
-            <option value="all">All categories</option>
-            {CATEGORIES.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-          <select
-            aria-label="Filter legislative status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-          >
-            <option value="all">All legislative statuses</option>
-            {STATUSES.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-          <select
-            aria-label="Filter relevance"
-            value={relevance}
-            onChange={(e) => setRelevance(e.target.value)}
-          >
-            <option value="all">All relevance levels</option>
-            {["Relevant", "Not Relevant", "Needs Review"].map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-          <select
-            aria-label="Filter implementation stage"
-            value={stage}
-            onChange={(e) => setStage(e.target.value)}
-          >
-            <option value="all">All review stages</option>
-            <option value="review">Awaiting review</option>
-            {STAGES.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={verifiedOnly}
-              onChange={(e) => setVerifiedOnly(e.target.checked)}
-            />
-            Verified only
-          </label>
-          <span className="result-count">{filtered.length} policies</span>
+            Clear Filters
+          </button>
         </div>
         <div className="library-list">
           {filtered.map((p) => (
-            <button
-              key={p.id}
-              className="library-item"
-              onClick={() => onSelect(p)}
-            >
-              <span className="document-icon large">
-                <FileText size={23} />
-              </span>
-              <div className="library-main">
-                <div className="library-meta">
-                  {p.billNumber || "POLICY DOCUMENT"}
-                  <span>·</span>
-                  {p.category}
-                  {p.sample && <b className="sample-label">FICTIONAL SAMPLE</b>}
-                </div>
-                <h3>{p.title}</h3>
-                <p>
-                  {p.impact || "Potential local impact requires staff review."}
-                </p>
-                <div className="library-details">
-                  <span>
-                    <Building2 size={13} />
-                    {p.department}
-                  </span>
-                  <span>Updated {formatDate(p.updatedAt)}</span>
-                  <span>Effective: {formatDate(p.effectiveDate, true)}</span>
-                </div>
-              </div>
-              <div className="library-badges">
-                <StatusBadge value={p.implementationStatus} />
-                <Badge>{p.legislativeStatus}</Badge>
-              </div>
-              <ChevronRight size={18} />
-            </button>
+            <PolicySummary key={p.id} policy={p} onSelect={onSelect} />
           ))}
         </div>
         {!filtered.length && (
@@ -1422,44 +1254,56 @@ function Analyzer({
   saved: (s: string) => Promise<void>;
   onSelect: (p: Policy) => void;
 }) {
+  const [choice, setChoice] = useState<"existing" | "upload" | null>(null);
+  const [selectedId, setSelectedId] = useState("");
   const [title, setTitle] = useState(""),
     [bill, setBill] = useState(""),
     [url, setUrl] = useState(""),
     [category, setCategory] = useState("Permitting"),
     [text, setText] = useState(""),
     [file, setFile] = useState<File | null>(null),
-    [inputMode, setInputMode] = useState<"text" | "file">("text"),
+    [inputMode, setInputMode] = useState<"text" | "file">("file"),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [result, setResult] = useState<Policy | null>(null);
   const training =
     data.policies.find((p) => p.id === "TRAINING-101") ||
     data.policies.find((p) => p.sourceText.includes("DEMO-PERMIT-002"));
-  function example() {
-    if (!training) return;
-    setTitle(training.title);
-    setBill(training.billNumber);
-    setUrl("");
-    setText(training.sourceText);
-    setCategory(training.category);
+  function choosePolicy(p?: Policy) {
+    setSelectedId(p?.id || "");
+    setTitle(p?.title || "");
+    setBill(p?.billNumber || "");
+    setUrl(p?.sourceUrl || "");
+    setCategory(p?.category || "Permitting");
+    setText(p?.sourceText || "");
     setInputMode("text");
+    setChoice("existing");
     setResult(null);
+    setError("");
+  }
+  function chooseUpload() {
+    setChoice("upload");
+    setInputMode("file");
+    setSelectedId("");
+    setTitle("");
+    setBill("");
+    setUrl("");
+    setText("");
+    setFile(null);
+    setResult(null);
+    setError("");
   }
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("example") === "1")
-      example();
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("example") === "1" && training) choosePolicy(training);
     else {
-      const id = new URLSearchParams(window.location.search).get("policy");
-      const p = data.policies.find((p) => p.id === id);
-      if (p) {
-        setTitle(p.title);
-        setBill(p.billNumber);
-        setUrl(p.sourceUrl);
-        setText(p.sourceText);
-        setCategory(p.category);
-      }
+      const p = data.policies.find((p) => p.id === q.get("policy"));
+      if (p) choosePolicy(p);
     }
   }, []);
+  useEffect(() => {
+    if (choice) document.getElementById("analyzer-step")?.focus();
+  }, [choice]);
   async function analyze(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -1485,11 +1329,11 @@ function Analyzer({
         ...(documentId ? { documentId } : { text }),
       });
       setResult(r.policy);
+      await saved("Explanation saved in Policies.");
       setTimeout(
         () => document.getElementById("analysis-result")?.focus(),
         100,
       );
-      await saved("Analysis saved to the legislation library.");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -1499,223 +1343,253 @@ function Analyzer({
   return (
     <>
       <Heading
-        eyebrow="DOCUMENT TO INSIGHT"
-        title="Make the complex clearer."
-        description="Explore policy language with source passages beside every explanation."
-      >
-        <button
-          className="btn secondary"
-          onClick={example}
-          disabled={!training}
+        eyebrow="POLICY EXPLANATIONS"
+        title="Understand a Policy"
+        description="Choose a policy or upload a document. We will help explain it in plain language."
+      />
+      {!choice && (
+        <section
+          className="analyzer-choices"
+          aria-label="Choose a starting point"
         >
-          <BookOpen size={16} />
-          Use training example
-        </button>
-      </Heading>
-      <div className="analyzer-layout">
-        <section className="panel">
+          <button className="choice-button" onClick={() => choosePolicy()}>
+            <Library size={28} />
+            <strong>Choose Existing Policy</strong>
+            <span>Find a policy already in your library.</span>
+          </button>
+          <button className="choice-button" onClick={chooseUpload}>
+            <Upload size={28} />
+            <strong>Upload Document</strong>
+            <span>Use a PDF or text file from your computer.</span>
+          </button>
+          {training && (
+            <p className="example-link">
+              Just exploring?{" "}
+              <button
+                className="text-link"
+                onClick={() => choosePolicy(training)}
+              >
+                Try a guided example
+              </button>
+            </p>
+          )}
+        </section>
+      )}
+      {choice && !result && (
+        <section
+          className="panel guided-analyzer"
+          aria-labelledby="analyzer-step"
+        >
           <div className="panel-heading">
-            <div>
-              <h2>Start with a source</h2>
-              <p>Upload a document or paste the legislative text.</p>
-            </div>
-            <span className="step-indicator">01 / INPUT</span>
+            <h2 id="analyzer-step" tabIndex={-1}>
+              {choice === "existing"
+                ? "Choose a policy"
+                : "Upload your document"}
+            </h2>
+            <button
+              className="btn secondary"
+              disabled={busy}
+              onClick={() => {
+                setChoice(null);
+                setError("");
+              }}
+            >
+              Back
+            </button>
           </div>
           <form className="panel-body form-stack" onSubmit={analyze}>
-            <Field label="Policy title">
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-                maxLength={240}
-                placeholder="e.g. Housing application coordination"
-              />
-            </Field>
-            <div className="form-grid">
-              <Field label="Bill or document number">
-                <input
-                  value={bill}
-                  onChange={(e) => setBill(e.target.value)}
-                  maxLength={100}
-                  placeholder="e.g. AB 123 / document ID"
-                />
-              </Field>
-              <Field label="Housing category">
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c}>{c}</option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-            <Field
-              label="Official source URL"
-              hint="The link is recorded for review. Paste or upload its text below; links are not automatically fetched."
-            >
-              <input
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://leginfo.legislature.ca.gov/…"
-              />
-            </Field>
-            <div className="segmented">
-              <button
-                type="button"
-                className={inputMode === "text" ? "selected" : ""}
-                onClick={() => setInputMode("text")}
-              >
-                <FileText size={15} />
-                Paste text
-              </button>
-              <button
-                type="button"
-                className={inputMode === "file" ? "selected" : ""}
-                onClick={() => setInputMode("file")}
-              >
-                <Upload size={15} />
-                Upload document
-              </button>
-            </div>
-            {inputMode === "text" ? (
-              <Field label="Source text">
-                <textarea
-                  rows={10}
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  maxLength={60000}
-                  minLength={40}
-                  required
-                  placeholder="Paste the policy text, including relevant sections and source details…"
-                />
-                <span className="input-counter">
-                  {text.length.toLocaleString()} / 60,000 characters
-                </span>
-              </Field>
-            ) : (
-              <label className="upload-zone">
-                <Upload size={27} />
-                <strong>{file ? file.name : "Select a policy document"}</strong>
-                <span>Text-based PDF or TXT · Up to 5 MB</span>
-                <input
-                  type="file"
-                  accept=".pdf,.txt"
-                  aria-label="Upload policy document"
-                  onChange={(e) => setFile(e.target.files?.[0] || null)}
-                />
-              </label>
-            )}
-            <div className="privacy-note">
-              <ShieldCheck size={15} />
-              <span>
-                {data.mode === "live"
-                  ? "The submitted document text will be sent to OpenAI for analysis. Use only documents approved for this service."
-                  : "Documents stay in this local staff workspace. Demo mode makes no AI service calls."}
-              </span>
-            </div>
+            <fieldset disabled={busy} className="plain-fieldset form-stack">
+              {choice === "existing" ? (
+                <>
+                  <Field label="Choose Existing Policy">
+                    <select
+                      value={selectedId}
+                      onChange={(e) =>
+                        choosePolicy(
+                          data.policies.find((p) => p.id === e.target.value),
+                        )
+                      }
+                      required
+                    >
+                      <option value="">Select a policy…</option>
+                      {data.policies.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.title}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  {selectedId && (
+                    <p>
+                      {text.length >= 40
+                        ? "The saved policy text is ready to explain."
+                        : "This policy needs source text. Add it under More Options, or go Back to upload a document."}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  {inputMode === "file" && (
+                    <Field
+                      label="Upload Document"
+                      hint="PDF with selectable text or a TXT file. Maximum size: 5 MB."
+                    >
+                      <input
+                        type="file"
+                        accept=".pdf,.txt"
+                        required
+                        onChange={(e) => {
+                          const chosen = e.target.files?.[0] || null;
+                          setFile(chosen);
+                          if (chosen && !title)
+                            setTitle(chosen.name.replace(/\.[^.]+$/, ""));
+                        }}
+                      />
+                    </Field>
+                  )}
+                  <Field label="Policy name">
+                    <input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      required
+                      maxLength={240}
+                      placeholder="Give this policy a short, clear name"
+                    />
+                  </Field>
+                </>
+              )}
+              <details className="simple-disclosure" key={choice}>
+                <summary>More Options</summary>
+                <div className="form-stack">
+                  <Field label="Bill or document number (optional)">
+                    <input
+                      value={bill}
+                      onChange={(e) => setBill(e.target.value)}
+                      maxLength={100}
+                    />
+                  </Field>
+                  <Field label="Policy category">
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                    >
+                      {CATEGORIES.map((c) => (
+                        <option key={c}>{c}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field
+                    label="Official source link (optional)"
+                    hint="We save this link for review. Include the document text as well."
+                  >
+                    <input
+                      type="url"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      placeholder="https://…"
+                    />
+                  </Field>
+                  {choice === "upload" && (
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={inputMode === "text"}
+                        onChange={(e) =>
+                          setInputMode(e.target.checked ? "text" : "file")
+                        }
+                      />
+                      Paste text instead of uploading a file
+                    </label>
+                  )}
+                  {inputMode === "text" && (
+                    <Field label="Policy text">
+                      <textarea
+                        rows={8}
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                        maxLength={60000}
+                        placeholder="Paste at least 40 characters from the policy."
+                      />
+                    </Field>
+                  )}
+                </div>
+              </details>
+            </fieldset>
+            <p className="privacy-note">
+              {data.mode === "live"
+                ? "This text will be sent to OpenAI for a draft explanation. Use only approved documents."
+                : process.env.NEXT_PUBLIC_SHARED_DEMO === "true"
+                  ? "Use fictional documents only. This demo is shared with everyone who visits and does not use live AI."
+                  : "This is a demonstration. No document text is sent to an AI service."}
+            </p>
             {error && (
               <div className="error-box" role="alert">
                 {error}
               </div>
             )}
-            <button className="btn primary full" disabled={busy}>
+            <button
+              className="btn primary full"
+              disabled={
+                busy ||
+                !title.trim() ||
+                (inputMode === "file" ? !file : text.trim().length < 40)
+              }
+            >
               {busy ? (
                 <>
-                  <Loader2 size={17} className="spin" />
-                  Reading and checking evidence…
+                  <Loader2 size={20} className="spin" />
+                  Preparing your explanation…
                 </>
               ) : (
-                <>
-                  <Sparkles size={17} />
-                  {data.mode === "demo"
-                    ? "Generate demo analysis"
-                    : "Analyze policy"}
-                </>
+                "Explain This Policy"
               )}
             </button>
+            {choice === "existing" && (
+              <p className="muted">
+                The new explanation is saved as a separate policy record. Your
+                original stays available.
+              </p>
+            )}
           </form>
         </section>
+      )}
+      {result?.analysis && (
         <section
-          className="panel analyzer-output"
+          className="panel guided-analyzer"
           id="analysis-result"
           tabIndex={-1}
-          aria-label="Policy analysis result"
+          aria-label="Policy explanation result"
         >
           <div className="panel-heading">
             <div>
-              <h2>Your analysis</h2>
-              <p>Evidence first. Interpretation for review.</p>
+              <h2>Your policy explained</h2>
+              <p>{result.title}</p>
             </div>
-            <span className="step-indicator">02 / INSIGHT</span>
           </div>
-          {result?.analysis ? (
-            <div className="panel-body">
-              <div className="output-title">
-                <h2>{result.title}</h2>
-                <button className="text-link" onClick={() => onSelect(result)}>
-                  Review policy
-                  <ArrowRight size={14} />
-                </button>
-              </div>
-              <AnalysisDisplay analysis={result.analysis} />
-              <div className="next-step">
-                <h3>What’s next?</h3>
-                <p>
-                  Review the explanation with a colleague, or compare it with
-                  the City procedure it may affect.
-                </p>
-                <Link
-                  className="btn primary"
-                  href={`/gaps?policy=${result.id}`}
-                >
-                  Check a City procedure
-                  <ArrowRight size={16} />
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <div className="analysis-placeholder">
-              <div className="orb">
-                <Sparkles size={30} strokeWidth={1.4} />
-              </div>
-              <h2>
-                A clearer starting point,
-                <br />
-                grounded in the source.
-              </h2>
+          <div className="panel-body">
+            <AnalysisDisplay analysis={result.analysis} />
+            <div className="next-step">
+              <h3>Next: view your policy</h3>
               <p>
-                Your explanation will appear here, with supporting passages and
-                open questions.
+                Find the saved explanation, important dates, tasks, and further
+                tools in the policy details.
               </p>
-              <div className="placeholder-steps">
-                <span>
-                  <Check size={15} />
-                  Plain-language explanation
-                </span>
-                <span>
-                  <Check size={15} />
-                  Potential local impacts
-                </span>
-                <span>
-                  <Check size={15} />
-                  Suggested review actions
-                </span>
-                <span>
-                  <Check size={15} />
-                  Source quotations and uncertainties
-                </span>
-              </div>
-              <div className="small-callout">
-                No verified source? It stays{" "}
-                <strong>Needs Verification.</strong>
-              </div>
+              <button className="btn primary" onClick={() => onSelect(result)}>
+                View Policy
+              </button>
             </div>
-          )}
+            <button
+              className="text-link"
+              onClick={() => {
+                setResult(null);
+                setChoice(null);
+              }}
+            >
+              Explain Another Policy
+            </button>
+          </div>
         </section>
-      </div>
+      )}
     </>
   );
 }
@@ -1742,8 +1616,8 @@ function Tracker({
     <>
       <Heading
         eyebrow="COORDINATED IMPLEMENTATION"
-        title="Turn understanding into action."
-        description="Shared responsibilities, clear next steps, and a record of what gets done."
+        title="Tasks"
+        description="See what your team needs to complete and update its progress."
       >
         <button
           className="btn primary"
@@ -1758,7 +1632,7 @@ function Tracker({
           <Search size={18} />
           <input
             aria-label="Search tasks"
-            placeholder="Search implementation tasks…"
+            placeholder="Search tasks…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -1790,42 +1664,21 @@ function Tracker({
               .filter((t) => t.status === status)
               .map((t) => (
                 <article className="task-card" key={t.id}>
-                  <div className="task-card-label">
-                    {data.policies.find((p) => p.id === t.policyId)
-                      ?.billNumber || "POLICY TASK"}
-                    <button
-                      className="icon-btn"
-                      aria-label={`Edit ${t.title}`}
-                      onClick={() => onTask(t)}
-                    >
-                      <ArrowUpRight size={16} />
-                    </button>
-                  </div>
-                  <button className="task-title" onClick={() => onTask(t)}>
-                    {t.title}
+                  <h3>{t.title}</h3>
+                  <p>
+                    {t.dueDate
+                      ? `Due ${formatDate(t.dueDate, true)}`
+                      : "No due date set"}
+                  </p>
+                  <button
+                    className="btn secondary"
+                    onClick={() => onTask(t)}
+                    aria-label={`View Task: ${t.title}`}
+                  >
+                    View Task
                   </button>
-                  <p>{t.description}</p>
-                  <div className="task-department">
-                    <Building2 size={14} />
-                    {t.department}
-                  </div>
-                  <div className="task-date-row">
-                    <span>
-                      <CalendarDays size={13} />
-                      {t.dueDate ? formatDate(t.dueDate, true) : "No due date"}
-                    </span>
-                    <Badge
-                      tone={
-                        t.dateType === "Verified statutory"
-                          ? "green"
-                          : "neutral"
-                      }
-                    >
-                      {t.dateType}
-                    </Badge>
-                  </div>
                   <div className="task-card-footer">
-                    <span>{t.assignee || "Unassigned"}</span>
+                    <span>Progress</span>
                     <select
                       aria-label={`Status for ${t.title}`}
                       value={t.status}
@@ -2243,7 +2096,7 @@ function PolicyDetail({
   saved: (s: string) => Promise<void>;
   onTask: (t: Partial<Task>) => void;
 }) {
-  const [tab, setTab] = useState("analysis"),
+  const [tab, setTab] = useState("overview"),
     [stage, setStage] = useState(p.implementationStatus),
     [department, setDepartment] = useState(p.department),
     [relevance, setRelevance] = useState(p.relevance),
@@ -2291,7 +2144,7 @@ function PolicyDetail({
           ? "Policy verified and review decision recorded."
           : "Review changes saved.",
       );
-      if (verify) setTab("analysis");
+      if (verify) setTab("overview");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -2299,55 +2152,217 @@ function PolicyDetail({
     }
   }
   return (
-    <Modal title={p.billNumber || "Policy record"} wide onClose={onClose}>
+    <Modal title="Policy Details" wide onClose={onClose}>
       <div className="policy-detail-top">
-        <div className="library-meta">
-          {p.category}
-          {p.sample && (
-            <b className="sample-label">FICTIONAL TRAINING SAMPLE</b>
-          )}
-        </div>
         <h2>{p.title}</h2>
-        <div className="detail-badges">
-          <StatusBadge value={p.implementationStatus} />
-          <StatusBadge value={p.verification} />
-          <Badge>{p.legislativeStatus}</Badge>
-        </div>
-        <p className="muted">{p.impact}</p>
-        <div className="detail-dates">
-          <span>
-            Effective date<strong>{formatDate(p.effectiveDate, true)}</strong>
-          </span>
-          <span>
-            Statutory deadline<strong>{formatDate(p.deadline, true)}</strong>
-          </span>
-          <span>
-            Last verified
-            <strong>
-              {p.lastVerifiedAt
-                ? formatDate(p.lastVerifiedAt)
-                : "Not yet verified"}
-            </strong>
-          </span>
-        </div>
-      </div>
-      <div className="tabs">
-        {[
-          ["analysis", "Analysis"],
-          ["source", "Source & passages"],
-          ["review", "Staff review"],
-          ["history", "History"],
-        ].map(([id, label]) => (
-          <button
-            key={id}
-            className={tab === id ? "active" : ""}
-            onClick={() => setTab(id)}
-          >
-            {label}
-          </button>
-        ))}
+        <p className="simple-status">{p.implementationStatus}</p>
+        <p>{p.category}</p>
+        {p.sample && (
+          <p className="sample-notice">
+            Fictional training policy — not an actual law.
+          </p>
+        )}
       </div>
       <div className="modal-body">
+        {tab !== "overview" && (
+          <div className="detail-back">
+            <button
+              className="btn secondary"
+              onClick={() => setTab("overview")}
+            >
+              Back to Overview
+            </button>
+            <h2>
+              {
+                {
+                  analysis: "Full Explanation",
+                  source: "Source Text",
+                  review: "Review Policy",
+                  history: "Review History",
+                }[tab]
+              }
+            </h2>
+          </div>
+        )}
+        {tab === "overview" && (
+          <div className="policy-overview">
+            <section>
+              <h3>Overview</h3>
+              {p.analysis ? (
+                <ClaimList items={p.analysis.summary} />
+              ) : (
+                <p>No explanation has been saved yet.</p>
+              )}
+              <Link
+                className="btn primary"
+                href={`/analyzer?policy=${p.id}`}
+                onClick={onClose}
+              >
+                Analyze This Policy
+              </Link>
+            </section>
+            <section>
+              <h3>What This Policy Does</h3>
+              {p.analysis ? (
+                <ClaimList items={p.analysis.plainEnglish} />
+              ) : (
+                <p>Analyze this policy to get a plain-language explanation.</p>
+              )}
+            </section>
+            <section>
+              <h3>Why It Matters</h3>
+              {p.analysis ? (
+                <ClaimList items={p.analysis.impacts} />
+              ) : (
+                <p>{p.impact || "The local impact still needs review."}</p>
+              )}
+            </section>
+            <section>
+              <h3>Current Status</h3>
+              <dl className="detail-facts">
+                <div>
+                  <dt>Review status</dt>
+                  <dd>{p.implementationStatus}</dd>
+                </div>
+                <div>
+                  <dt>Legal status</dt>
+                  <dd>{p.legislativeStatus}</dd>
+                </div>
+                <div>
+                  <dt>Source verification</dt>
+                  <dd>{p.verification}</dd>
+                </div>
+                <div>
+                  <dt>Responsible department</dt>
+                  <dd>{p.department}</dd>
+                </div>
+              </dl>
+              <button
+                className="btn secondary"
+                onClick={() => setTab("review")}
+              >
+                Review or Update Status
+              </button>
+            </section>
+            <section>
+              <h3>Important Dates</h3>
+              <dl className="detail-facts">
+                <div>
+                  <dt>Effective date</dt>
+                  <dd>{formatDate(p.effectiveDate, true)}</dd>
+                </div>
+                <div>
+                  <dt>Legal deadline</dt>
+                  <dd>{formatDate(p.deadline, true)}</dd>
+                </div>
+                <div>
+                  <dt>Last verified</dt>
+                  <dd>
+                    {p.lastVerifiedAt
+                      ? formatDate(p.lastVerifiedAt)
+                      : "Not yet verified"}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+            <section>
+              <h3>Tasks</h3>
+              {data.tasks
+                .filter((t) => t.policyId === p.id)
+                .map((t) => (
+                  <article className="simple-task" key={t.id}>
+                    <button onClick={() => onTask(t)}>{t.title}</button>
+                    <p>
+                      {t.status} ·{" "}
+                      {t.dueDate
+                        ? `Due ${formatDate(t.dueDate, true)}`
+                        : "No due date set"}
+                    </p>
+                  </article>
+                ))}
+              {!data.tasks.some((t) => t.policyId === p.id) && (
+                <p>No tasks have been added for this policy.</p>
+              )}
+              <button
+                className="btn secondary"
+                onClick={() =>
+                  onTask({ policyId: p.id, department: p.department })
+                }
+              >
+                Add Task
+              </button>
+            </section>
+            <section>
+              <h3>Documents</h3>
+              <p>
+                {p.billNumber
+                  ? `Document number: ${p.billNumber}`
+                  : "Submitted policy document"}
+              </p>
+              <button
+                className="btn secondary"
+                onClick={() => setTab("source")}
+              >
+                Read Source Text
+              </button>
+              {p.sourceUrl && (
+                <OfficialLink url={p.sourceUrl}>
+                  Open Official Source
+                </OfficialLink>
+              )}
+              {data.documents
+                .filter((d) =>
+                  data.tasks.some(
+                    (t) =>
+                      t.policyId === p.id && t.supportingDocumentId === d.id,
+                  ),
+                )
+                .map((d) => (
+                  <p key={d.id}>
+                    <a
+                      className="text-link"
+                      href={`/api/documents/${d.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {d.name}
+                    </a>
+                  </p>
+                ))}
+            </section>
+            <details className="simple-disclosure">
+              <summary>More Tools</summary>
+              <div className="detail-tools">
+                <Link
+                  className="btn secondary"
+                  href={`/compare?policy=${p.id}`}
+                  onClick={onClose}
+                >
+                  Compare Versions
+                </Link>
+                <Link
+                  className="btn secondary"
+                  href={`/gaps?policy=${p.id}`}
+                  onClick={onClose}
+                >
+                  Check City Procedures
+                </Link>
+                <button
+                  className="btn secondary"
+                  onClick={() => setTab("history")}
+                >
+                  View Review History
+                </button>
+                <button
+                  className="btn secondary"
+                  onClick={() => setTab("analysis")}
+                >
+                  Read Full Explanation
+                </button>
+              </div>
+            </details>
+          </div>
+        )}
         {tab === "analysis" &&
           (p.analysis ? (
             <AnalysisDisplay analysis={p.analysis} />
@@ -2581,15 +2596,8 @@ function PolicyDetail({
         )}
       </div>
       <div className="modal-footer">
-        <span className="muted">
-          Research support · Human judgment required
-        </span>
-        <button
-          className="btn secondary"
-          onClick={() => onTask({ policyId: p.id, department: p.department })}
-        >
-          <Plus size={16} />
-          Create implementation task
+        <button className="btn secondary" onClick={onClose}>
+          Back to Policies
         </button>
       </div>
     </Modal>
@@ -2638,11 +2646,7 @@ function TaskEditor({
         },
         task.id ? "PATCH" : "POST",
       );
-      await saved(
-        task.id
-          ? "Implementation task updated."
-          : "Implementation task created.",
-      );
+      await saved(task.id ? "Task updated." : "Task created.");
       onClose();
     } catch (e) {
       setError((e as Error).message);
@@ -2651,12 +2655,7 @@ function TaskEditor({
     }
   }
   return (
-    <Modal
-      title={
-        task.id ? "Update implementation task" : "Create implementation task"
-      }
-      onClose={onClose}
-    >
+    <Modal title={task.id ? "Update Task" : "Add Task"} onClose={onClose}>
       <form onSubmit={submit}>
         <div className="modal-body form-stack">
           <Field label="Task title">
@@ -3090,7 +3089,7 @@ function Settings({
                 </Field>
               </div>
               <button className="btn primary" disabled={busy}>
-                Provision employee
+                Add Employee
               </button>
             </form>
           )}
@@ -3142,7 +3141,7 @@ function Settings({
       <section className="panel">
         <div className="panel-heading">
           <div>
-            <h2>Review & implementation history</h2>
+            <h2>Recent Activity</h2>
             <p>
               Recent source edits, analyses, review decisions, and workflow
               updates.
