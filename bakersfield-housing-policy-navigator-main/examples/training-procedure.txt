@@ -1,0 +1,11 @@
+TRAINING EXAMPLE ONLY - NOT AN ACTUAL CITY PROCEDURE
+Document identifier: DEMO-PROCEDURE-001
+Title: Simulated Housing Application Intake Procedure
+
+Step 1. Receive the simulated housing application and create an intake log entry.
+Step 2. Record the applicant's name, intake date, and assigned application number in the intake log.
+Step 3. Retain the intake log with the application record.
+
+Scope note: This is an intentionally incomplete excerpt created for a classroom exercise. It does not describe the full set of City procedures. The absence of a checklist, referral record, or staff owner in this excerpt does not establish noncompliance.
+
+This text has no legal effect and is not an adopted City of Bakersfield procedure.

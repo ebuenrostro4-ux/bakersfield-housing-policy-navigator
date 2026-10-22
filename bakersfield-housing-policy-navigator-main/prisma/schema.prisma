@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         String    @default("STAFF")
+  department   String    @default("Planning")
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  sessions     Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model Policy {
+  id                   String       @id @default(cuid())
+  title                String
+  billNumber           String       @default("")
+  sourceIdentifier     String       @default("")
+  sessionYear          String       @default("")
+  recordType           String       @default("Submitted policy")
+  category             String       @default("Administration")
+  legislativeStatus    String       @default("Needs Verification")
+  relevance            String       @default("Needs Review")
+  impact               String       @default("")
+  introducedDate       DateTime?
+  publishedDate        DateTime?
+  enactedDate          DateTime?
+  lastAmendedDate      DateTime?
+  effectiveDate        DateTime?
+  deadline             DateTime?
+  sourceUrl            String       @default("")
+  sourceText           String       @default("")
+  sourceStatus         String       @default("Needs Verification")
+  sourceHash           String       @default("")
+  lastCheckedAt        DateTime?
+  updateState          String       @default("Reviewed")
+  lastChangeSummary    String       @default("")
+  sample               Boolean      @default(false)
+  verification         String       @default("Needs Verification")
+  implementationStatus String       @default("Not Reviewed")
+  department           String       @default("Planning")
+  analysisJson         String?
+  lastVerifiedAt       DateTime?
+  reviewNote           String       @default("")
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  tasks                Task[]
+  comparisons          Comparison[]
+  updates              PolicyUpdate[]
+
+  @@index([sourceIdentifier])
+  @@index([lastCheckedAt])
+}
+
+model PolicyUpdate {
+  id            String   @id @default(cuid())
+  policyId      String?
+  policy        Policy?  @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  eventType     String
+  summary       String
+  changedFields String   @default("")
+  sourceUrl     String   @default("")
+  sourceHash    String   @default("")
+  beforeJson    String?
+  afterJson     String?
+  detectedAt    DateTime @default(now())
+
+  @@index([policyId])
+  @@index([detectedAt])
+}
+
+model Task {
+  id                   String    @id @default(cuid())
+  title                String
+  description          String    @default("")
+  department           String    @default("Planning")
+  assignee             String    @default("")
+  dueDate              DateTime?
+  dateType             String    @default("Staff target")
+  status               String    @default("To do")
+  notes                String    @default("")
+  policyId             String
+  policy               Policy    @relation(fields: [policyId], references: [id], onDelete: Restrict)
+  supportingDocumentId String?
+  supportingDocument   Document? @relation(fields: [supportingDocumentId], references: [id], onDelete: SetNull)
+  sourceQuote          String    @default("")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  name      String
+  kind      String
+  text      String
+  createdAt DateTime @default(now())
+  tasks     Task[]
+}
+
+model Audit {
+  id         String   @id @default(cuid())
+  actor      String
+  action     String
+  entityType String
+  entityId   String
+  detail     String
+  beforeJson String?
+  afterJson  String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model Comparison {
+  id         String   @id @default(cuid())
+  kind       String
+  mode       String
+  resultJson String
+  policyId   String
+  policy     Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+}
