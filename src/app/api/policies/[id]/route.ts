@@ -1,3 +1,4 @@
+import { requirePrivateWorkspace } from "@/lib/public-demo";
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -26,13 +27,15 @@ export async function PATCH(
 ) {
   try {
     requireSameOrigin(request);
+    requirePrivateWorkspace();
     const user = await requireUser(request);
     const { id } = await context.params;
     const body = await readJson(request);
     if ("lastVerifiedAt" in body)
       throw new ApiError(400, "Verification timestamps are set by the server.");
     const before = await db.policy.findUnique({ where: { id } });
-    if (!before) throw new ApiError(404, "Policy not found.");
+    if (!before || before.sample || before.archived)
+      throw new ApiError(404, "Policy not found.");
     const data: Prisma.PolicyUpdateInput = {};
     for (const [key, max] of Object.entries({
       title: 240,
@@ -194,6 +197,17 @@ export async function PATCH(
         }
       }
       data.analysisJson = JSON.stringify(parsed);
+    }
+    if (sourceText !== before.sourceText || sourceUrl !== before.sourceUrl)
+      throw new ApiError(
+        409,
+        "Use Import Policy → Updated version to preserve the source history.",
+      );
+    if ("analysis" in body) {
+      data.reviewStatus = "Pending Review";
+      data.reviewedAt = null;
+      data.reviewerName = "";
+      data.reviewComments = "";
     }
     const policy = await db.$transaction(async (tx) => {
       const updated = await tx.policy.update({ where: { id }, data });

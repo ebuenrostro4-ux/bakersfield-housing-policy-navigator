@@ -1,3 +1,4 @@
+import { matchingCatalog, catalogMetadata } from "./policy-catalog";
 import { NextResponse } from "next/server";
 import type { Policy, Prisma, PrismaClient } from "@prisma/client";
 import type { AnalysisResult } from "./types";
@@ -174,7 +175,8 @@ export function policyJSON(policy: Policy) {
   } catch {
     /* Invalid legacy analysis remains unavailable. */
   }
-  return { ...rest, analysis };
+  const entry = matchingCatalog(policy);
+  return { ...rest, analysis, catalog: entry ? catalogMetadata(entry) : null };
 }
 
 export async function audit(
@@ -208,7 +210,7 @@ export function correctedAnalysis(
     throw new ApiError(400, "Analysis must be a structured object.");
   const result = value as Record<string, unknown>;
   const cleaned: Record<string, unknown> = {
-    mode: enumValue(result.mode, ["demo", "live"], "analysis mode"),
+    mode: enumValue(result.mode, ["demo", "live", "prepared"], "analysis mode"),
   };
   for (const key of [
     "summary",

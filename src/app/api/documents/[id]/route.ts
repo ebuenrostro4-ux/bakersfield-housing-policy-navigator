@@ -10,7 +10,8 @@ export async function GET(
     await requireUser(request);
     const { id } = await params;
     const document = await db.document.findUnique({ where: { id } });
-    if (!document) throw new ApiError(404, "Document not found.");
+    if (!document || ["demo-procedure", "demo-previous"].includes(id))
+      throw new ApiError(404, "Document not found.");
     return new Response(document.text, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",

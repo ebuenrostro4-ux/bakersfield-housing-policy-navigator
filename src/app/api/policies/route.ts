@@ -1,3 +1,4 @@
+import { requirePrivateWorkspace } from "@/lib/public-demo";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
@@ -5,6 +6,7 @@ import {
   apiError,
   audit,
   enumValue,
+  dateValue,
   policyJSON,
   readJson,
   requireSameOrigin,
@@ -18,6 +20,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     requireSameOrigin(request);
+    requirePrivateWorkspace();
     const user = await requireUser(request);
     const body = await readJson(request);
     if (
@@ -33,6 +36,12 @@ export async function POST(request: Request) {
         "Create the policy as Needs Verification; a reviewer must approve legislative status and official dates.",
       );
     const data = {
+      uploadedBy: user.name,
+      notes: stringValue(body.notes ?? "", "Notes", 10000),
+      reportedEffectiveDate: dateValue(
+        body.reportedEffectiveDate ?? null,
+        "Reported effective date",
+      ),
       title: stringValue(body.title, "Title", 240, true),
       billNumber: stringValue(body.billNumber ?? "", "Bill number", 100),
       category: enumValue(
@@ -54,8 +63,23 @@ export async function POST(request: Request) {
           String(body.sourceText ?? ""),
         ),
     };
+    if (data.sourceText.length < 40)
+      throw new ApiError(400, "Provide at least 40 characters of policy text.");
     const policy = await db.$transaction(async (tx) => {
       const created = await tx.policy.create({ data });
+      await tx.follow.create({
+        data: { userId: user.id, policyId: created.id },
+      });
+      await tx.policyVersion.create({
+        data: {
+          policyId: created.id,
+          number: 1,
+          title: created.title,
+          sourceText: created.sourceText,
+          sourceUrl: created.sourceUrl,
+          uploadedBy: user.name,
+        },
+      });
       await audit(tx, {
         actor: user.name,
         action: "Policy added",

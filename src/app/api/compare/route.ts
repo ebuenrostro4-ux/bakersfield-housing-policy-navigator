@@ -1,3 +1,4 @@
+import { isPublicDemo } from "@/lib/public-demo";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -15,10 +16,14 @@ import { limitAnalysis } from "@/lib/rate-limit";
 export const runtime = "nodejs";
 export async function GET(request: Request) {
   try {
-    await requireUser(request);
+    const viewer = (await requireUser(request)).role === "VIEWER";
+    if (viewer) return NextResponse.json({ comparisons: [] });
     const kind = new URL(request.url).searchParams.get("kind");
     const rows = await db.comparison.findMany({
-      where: kind === "gap" || kind === "change" ? { kind } : {},
+      where: {
+        policy: { sample: false, archived: false },
+        ...(kind === "gap" || kind === "change" ? { kind } : {}),
+      },
       orderBy: { createdAt: "desc" },
       take: 100,
       include: { policy: { select: { title: true } } },
@@ -40,12 +45,26 @@ export async function POST(request: Request) {
     const user = await requireUser(request);
     limitAnalysis(user.id);
     const body = await readJson(request, 300_000);
+    if (
+      isPublicDemo() &&
+      (body.policyId !== "TRAINING-101" ||
+        !["demo-procedure", "demo-previous"].includes(
+          String(body.documentId),
+        ) ||
+        body.comparisonText)
+    ) {
+      throw new ApiError(
+        403,
+        "Public comparisons use the fictional guided examples only. Real City procedures require a private approved workspace.",
+      );
+    }
     const policyId = stringValue(body.policyId, "Policy ID", 100, true);
     const kind = enumValue(body.kind, ["gap", "change"], "comparison type") as
       | "gap"
       | "change";
     const policy = await db.policy.findUnique({ where: { id: policyId } });
-    if (!policy) throw new ApiError(404, "Policy not found.");
+    if (!policy || policy.sample || policy.archived)
+      throw new ApiError(404, "Policy not found.");
     let comparisonText = stringValue(
       body.comparisonText ?? "",
       "Comparison text",

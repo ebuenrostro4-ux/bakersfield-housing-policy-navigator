@@ -18,6 +18,8 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   sessions     Session[]
+  resets       PasswordReset[]
+  tasks        Task[]
 }
 
 model Session {
@@ -52,6 +54,17 @@ model Policy {
   reviewNote           String       @default("")
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
+  uploadedBy           String       @default("")
+  reportedEffectiveDate DateTime?
+  notes                String       @default("")
+  archived             Boolean      @default(false)
+  reviewStatus         String       @default("Pending Analysis")
+  reviewerName         String       @default("")
+  reviewedAt           DateTime?
+  reviewComments       String       @default("")
+  version              Int          @default(1)
+  versions             PolicyVersion[]
+  followers            Follow[]
   tasks                Task[]
   comparisons          Comparison[]
 }
@@ -62,12 +75,16 @@ model Task {
   description          String    @default("")
   department           String    @default("Planning")
   assignee             String    @default("")
+  assigneeId           String?
+  assignedUser         User?     @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+  priority             String    @default("Normal")
+  progress             Int       @default(0)
   dueDate              DateTime?
   dateType             String    @default("Staff target")
-  status               String    @default("To do")
+  status               String    @default("Not Started")
   notes                String    @default("")
-  policyId             String
-  policy               Policy    @relation(fields: [policyId], references: [id], onDelete: Restrict)
+  policyId             String?
+  policy               Policy?   @relation(fields: [policyId], references: [id], onDelete: Restrict)
   supportingDocumentId String?
   supportingDocument   Document? @relation(fields: [supportingDocumentId], references: [id], onDelete: SetNull)
   sourceQuote          String    @default("")
@@ -106,4 +123,48 @@ model Comparison {
   policyId   String
   policy     Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
+}
+
+model PasswordReset {
+  id String @id @default(cuid())
+  tokenHash String @unique
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+}
+model PolicyVersion {
+  id String @id @default(cuid())
+  policyId String
+  policy Policy @relation(fields:[policyId],references:[id],onDelete:Restrict)
+  number Int
+  title String
+  sourceText String
+  sourceUrl String
+  uploadedBy String
+  createdAt DateTime @default(now())
+  @@unique([policyId,number])
+}
+model Follow {
+  id String @id @default(cuid())
+  userId String
+  policyId String
+  policy Policy @relation(fields:[policyId],references:[id],onDelete:Cascade)
+  @@unique([userId,policyId])
+}
+model Notification {
+  id String @id @default(cuid())
+  userId String
+  key String @unique
+  title String
+  href String
+  readAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId,readAt])
+}
+model LoginAttempt {
+  key String @id
+  count Int @default(0)
+  expiresAt DateTime
 }

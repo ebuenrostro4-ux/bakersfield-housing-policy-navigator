@@ -1,3 +1,5 @@
+import { isPublicDemo, requirePrivateWorkspace } from "@/lib/public-demo";
+import { matchingCatalog } from "@/lib/policy-catalog";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -23,6 +25,81 @@ export async function POST(request: Request) {
     const user = await requireUser(request);
     limitAnalysis(user.id);
     const body = await readJson(request, 300_000);
+    if (body.policyId) {
+      const existing = await db.policy.findUnique({
+        where: { id: stringValue(body.policyId, "Policy ID", 100, true) },
+      });
+      if (!existing) throw new ApiError(404, "Policy not found.");
+      if (existing.sample || existing.archived)
+        throw new ApiError(
+          400,
+          "Archived and training policies cannot be analyzed in the employee workspace.",
+        );
+      if (
+        matchingCatalog(existing) &&
+        existing.analysisJson &&
+        process.env.AI_MODE !== "live"
+      ) {
+        return NextResponse.json({ policy: policyJSON(existing) });
+      }
+      requirePrivateWorkspace();
+      const analysis = await analyzePolicy({
+        id: existing.id,
+        text: existing.sourceText,
+        name: existing.title,
+      });
+      const updated = await db.$transaction(async (tx) => {
+        const current = await tx.policy.findUnique({
+          where: { id: existing.id },
+        });
+        if (
+          !current ||
+          current.archived ||
+          current.version !== existing.version ||
+          current.sourceText !== existing.sourceText ||
+          current.updatedAt.getTime() !== existing.updatedAt.getTime()
+        )
+          throw new ApiError(
+            409,
+            "Policy changed during analysis. Refresh and analyze its current version.",
+          );
+        const result = await tx.policy.update({
+          where: { id: existing.id },
+          data: {
+            analysisJson: JSON.stringify(analysis),
+            reviewStatus: "Pending Review",
+            reviewerName: "",
+            reviewedAt: null,
+            reviewComments: "",
+          },
+        });
+        await audit(tx, {
+          actor: user.name,
+          action: "Policy analysis completed",
+          entityType: "Policy",
+          entityId: existing.id,
+          detail: `${analysis.mode} analysis; pending human review.`,
+        });
+        for (const reviewer of await tx.user.findMany({
+          where: { active: true, role: { in: ["ADMIN", "REVIEWER"] } },
+        }))
+          await tx.notification.upsert({
+            where: {
+              key: `analysis-${existing.id}-${existing.version}-${reviewer.id}`,
+            },
+            create: {
+              userId: reviewer.id,
+              key: `analysis-${existing.id}-${existing.version}-${reviewer.id}`,
+              title: `Analysis ready: ${existing.title}`,
+              href: "/library",
+            },
+            update: { readAt: null },
+          });
+        return result;
+      });
+      return NextResponse.json({ policy: policyJSON(updated) });
+    }
+    requirePrivateWorkspace();
     const title = stringValue(body.title, "Policy title", 240, true);
     const billNumber = stringValue(body.billNumber ?? "", "Bill number", 100);
     const category = enumValue(
@@ -51,6 +128,8 @@ export async function POST(request: Request) {
         data: {
           id,
           title,
+          uploadedBy: user.name,
+          reviewStatus: "Pending Review",
           billNumber,
           category,
           sourceUrl,
@@ -64,6 +143,17 @@ export async function POST(request: Request) {
           implementationStatus: "Under Review",
         },
       });
+      await tx.policyVersion.create({
+        data: {
+          policyId: id,
+          number: 1,
+          title,
+          sourceText,
+          sourceUrl,
+          uploadedBy: user.name,
+        },
+      });
+      await tx.follow.create({ data: { policyId: id, userId: user.id } });
       await audit(tx, {
         actor: user.name,
         action:

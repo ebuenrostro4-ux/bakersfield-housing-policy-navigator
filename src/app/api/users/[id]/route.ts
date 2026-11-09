@@ -1,3 +1,4 @@
+import { requirePrivateWorkspace } from "@/lib/public-demo";
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -24,6 +25,7 @@ export async function PATCH(
 ) {
   try {
     requireSameOrigin(request);
+    requirePrivateWorkspace();
     const actor = await requireUser(request);
     requireAdmin(actor);
     const { id } = await params;
@@ -32,7 +34,11 @@ export async function PATCH(
     if (!before) throw new ApiError(404, "Employee not found.");
     const data: Prisma.UserUpdateInput = {};
     if ("role" in body)
-      data.role = enumValue(body.role, ["STAFF", "REVIEWER", "ADMIN"], "role");
+      data.role = enumValue(
+        body.role,
+        ["STAFF", "REVIEWER", "ADMIN", "VIEWER"],
+        "role",
+      );
     if ("active" in body) {
       if (typeof body.active !== "boolean")
         throw new ApiError(400, "Active must be true or false.");

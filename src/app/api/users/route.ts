@@ -1,3 +1,4 @@
+import { requirePrivateWorkspace } from "@/lib/public-demo";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
@@ -20,6 +21,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     requireSameOrigin(request);
+    requirePrivateWorkspace();
     const actor = await requireUser(request);
     requireAdmin(actor);
     const body = await readJson(request, 10000);
@@ -28,7 +30,7 @@ export async function POST(request: Request) {
       password = stringValue(body.password, "Password", 200, true),
       role = enumValue(
         body.role ?? "STAFF",
-        ["STAFF", "REVIEWER", "ADMIN"],
+        ["STAFF", "REVIEWER", "ADMIN", "VIEWER"],
         "role",
       ),
       department = enumValue(
