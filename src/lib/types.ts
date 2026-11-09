@@ -1,4 +1,4 @@
-export type Role = "ADMIN" | "STAFF" | "REVIEWER";
+export type Role = "ADMIN" | "STAFF" | "REVIEWER" | "VIEWER";
 export type User = {
   id: string;
   name: string;
@@ -12,9 +12,11 @@ export type Claim = {
   quote: string;
   sourceId: string;
   verification: "Needs Verification" | "Source supported" | "Staff verified";
+  sourceUrl?: string;
+  sourceLabel?: string;
 };
 export type AnalysisResult = {
-  mode: "demo" | "live";
+  mode: "demo" | "live" | "prepared";
   summary: Claim[];
   changes: Claim[];
   plainEnglish: Claim[];
@@ -23,6 +25,14 @@ export type AnalysisResult = {
   dates: Claim[];
   questions: string[];
   warnings: string[];
+};
+export type PolicyCatalog = {
+  session: string;
+  edition: string;
+  checkedOn: string;
+  scope: string;
+  history: { when: string; description: string; sourceUrl: string }[];
+  impacts: { area: string; suggestion: string }[];
 };
 export type Policy = {
   id: string;
@@ -45,6 +55,16 @@ export type Policy = {
   createdAt: string;
   updatedAt: string;
   reviewNote: string;
+  catalog?: PolicyCatalog | null;
+  uploadedBy: string;
+  reportedEffectiveDate: string | null;
+  notes: string;
+  archived: boolean;
+  reviewStatus: string;
+  reviewerName: string;
+  reviewedAt: string | null;
+  reviewComments: string;
+  version: number;
 };
 export type Task = {
   id: string;
@@ -58,9 +78,19 @@ export type Task = {
     | "Verified statutory"
     | "AI suggested"
     | "Needs Verification";
-  status: "To do" | "In progress" | "Done";
+  status:
+    | "To do"
+    | "In progress"
+    | "Done"
+    | "Not Started"
+    | "In Progress"
+    | "Blocked"
+    | "Completed";
+  assigneeId: string | null;
+  priority: string;
+  progress: number;
   notes: string;
-  policyId: string;
+  policyId: string | null;
   supportingDocumentId: string | null;
   sourceQuote: string;
   createdAt: string;
@@ -105,6 +135,15 @@ export type Workspace = {
   documents: Document[];
   audit: Audit[];
   users: User[];
+  publicDemo?: boolean;
+  following?: string[];
+  employees?: { id: string; name: string; role: string; department: string }[];
+  notifications?: {
+    id: string;
+    title: string;
+    href: string;
+    readAt: string | null;
+  }[];
 };
 export const CATEGORIES = [
   "Permitting",
@@ -126,6 +165,7 @@ export const STAGES = [
   "Under Review",
   "Action Required",
   "Completed",
+  "Reviewed",
 ];
 export const STATUSES = [
   "Needs Verification",
@@ -133,4 +173,5 @@ export const STATUSES = [
   "Passed",
   "Enacted",
   "Effective",
+  "Published guidance",
 ];

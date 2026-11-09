@@ -57,6 +57,29 @@ import {
   formatDate,
 } from "./ui";
 
+import {
+  PolicyUpdates,
+  PolicyResearch,
+  DemoActions,
+  PublicTask,
+  PublicComparison,
+} from "./presentation";
+
+import {
+  PasswordHelp,
+  PolicyImport,
+  EmployeeLibrary,
+  EmployeeHome,
+  EmployeeTasks,
+  EmployeeTaskEditor,
+  EmployeeTaskCard,
+  PolicyWorkflow,
+  PolicyRecords,
+  ArchivedPolicies,
+  EmployeeReset,
+  Notifications,
+} from "./employee";
+
 type View =
   | "dashboard"
   | "library"
@@ -81,7 +104,7 @@ const navigation = [
 const advancedNavigation = [
   { id: "gaps", label: "Check City Procedures", path: "/gaps" },
   { id: "compare", label: "Compare Versions", path: "/compare" },
-  { id: "settings", label: "Recent Activity", path: "/settings" },
+  { id: "settings", label: "Settings & Activity", path: "/settings" },
 ];
 const pageNames: Record<View, string> = {
   dashboard: "Home",
@@ -90,7 +113,7 @@ const pageNames: Record<View, string> = {
   tracker: "Tasks",
   gaps: "Check City Procedures",
   compare: "Compare Versions",
-  settings: "Recent Activity",
+  settings: "Settings & Activity",
   help: "Help",
 };
 async function request<T>(
@@ -129,6 +152,7 @@ export default function Navigator() {
   const view = ([...navigation, ...advancedNavigation].find(
     (n) => n.path === pathname,
   )?.id || "dashboard") as View;
+  const [importMode, setImportMode] = useState<"import" | "paste" | null>(null);
   const [data, setData] = useState<Workspace | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
@@ -138,7 +162,8 @@ export default function Navigator() {
     [addPolicy, setAddPolicy] = useState(false),
     [mobile, setMobile] = useState(false),
     [help, setHelp] = useState(false),
-    [demoMode, setDemoMode] = useState(false);
+    [demoMode, setDemoMode] = useState(false),
+    [publicDemo, setPublicDemo] = useState(false);
   const refresh = useCallback(async () => {
     try {
       const d = await request<Workspace>("/api/workspace");
@@ -154,9 +179,12 @@ export default function Navigator() {
     }
   }, []);
   useEffect(() => {
-    request<{ user: User | null; demoMode?: boolean }>("/api/session")
+    request<{ user: User | null; demoMode?: boolean; publicDemo?: boolean }>(
+      "/api/session",
+    )
       .then(async (s) => {
         setDemoMode(!!s.demoMode);
+        setPublicDemo(!!s.publicDemo);
         if (s.user) await refresh();
       })
       .catch((e) => setError(e.message))
@@ -218,6 +246,7 @@ export default function Navigator() {
     return (
       <Login
         demoMode={demoMode}
+        publicDemo={publicDemo}
         error={error}
         onLogin={async (email, password) => {
           await request("/api/session", { email, password });
@@ -255,7 +284,7 @@ export default function Navigator() {
         </Link>
         <div className="workspace-label">
           <span className="workspace-dot" />
-          INTERNAL CITY WORKSPACE
+          AUTHORIZED WORKSPACE
         </div>
         <nav aria-label="Main navigation">
           {navigation.map((n) => (
@@ -352,12 +381,12 @@ export default function Navigator() {
             <span className="mode-dot" />
             {data.mode === "demo" ? (
               <>
-                <strong>Demonstration workspace</strong>
+                <strong>University prototype</strong>
                 <span className="banner-detail">
                   {" "}
-                  {process.env.NEXT_PUBLIC_SHARED_DEMO === "true"
-                    ? "· Public practice space. Use fictional information only. Everyone shares this workspace; edits may reset when the server restarts."
-                    : "· Sample policies are fictional. Demo analysis does not use live AI."}
+                  {publicDemo
+                    ? "· Source-backed policy briefs + fictional practice actions. No uploads or private information. Shared edits may reset on restart."
+                    : "· Authorized test accounts. Live AI is off. Use public source documents."}
                 </span>
               </>
             ) : (
@@ -365,8 +394,7 @@ export default function Navigator() {
                 <strong>Live AI enabled</strong>
                 <span className="banner-detail">
                   {" "}
-                  · Analysis requires staff review. Training policies remain
-                  fictional.
+                  · Use approved documents. All analyses require human review.
                 </span>
               </>
             )}
@@ -389,42 +417,47 @@ export default function Navigator() {
               </button>
             </div>
           )}
+          <Notifications data={data} saved={saved} />
           {view === "dashboard" && (
-            <Dashboard data={data} onSelect={setSelected} onTask={setTask} />
-          )}
-          {view === "library" && (
-            <LibraryView
+            <EmployeeHome
               data={data}
               onSelect={setSelected}
-              onAdd={() => setAddPolicy(true)}
+              onTask={setTask}
+              onImport={setImportMode}
+              saved={saved}
             />
           )}
-          {view === "analyzer" && (
+          {view === "library" && (
+            <EmployeeLibrary
+              data={data}
+              onSelect={setSelected}
+              onImport={setImportMode}
+            />
+          )}
+          {view === "analyzer" && data.user.role === "VIEWER" && (
+            <p>
+              Viewer accounts can read reviewed analyses in Policies. Analysis
+              creation requires Employee access.
+            </p>
+          )}
+          {view === "analyzer" && data.user.role !== "VIEWER" && (
             <Analyzer data={data} saved={saved} onSelect={setSelected} />
           )}
           {view === "tracker" && (
-            <Tracker
-              data={data}
-              onTask={setTask}
-              onUpdate={async (t, status) => {
-                try {
-                  await request(`/api/tasks/${t.id}`, { status }, "PATCH");
-                  await saved("Task status updated.");
-                } catch (e) {
-                  setError((e as Error).message);
-                }
-              }}
-            />
+            <EmployeeTasks data={data} onTask={setTask} saved={saved} />
           )}
-          {(view === "gaps" || view === "compare") && (
-            <Comparison
-              key={view}
-              data={data}
-              kind={view === "gaps" ? "gap" : "change"}
-              saved={saved}
-              onTask={setTask}
-            />
-          )}
+          {(view === "gaps" || view === "compare") &&
+            (data.publicDemo ? (
+              <PublicComparison kind={view === "gaps" ? "gap" : "change"} />
+            ) : (
+              <Comparison
+                key={view}
+                data={data}
+                kind={view === "gaps" ? "gap" : "change"}
+                saved={saved}
+                onTask={setTask}
+              />
+            ))}
           {view === "settings" && <Settings data={data} saved={saved} />}
           {view === "help" && <HelpView mode={data.mode} />}
           <footer className="page-footer">
@@ -456,11 +489,19 @@ export default function Navigator() {
         />
       )}
       {task && (
-        <TaskEditor
+        <EmployeeTaskEditor
           task={task}
           data={data}
           onClose={() => setTask(null)}
           saved={saved}
+        />
+      )}
+      {importMode && (
+        <PolicyImport
+          mode={importMode}
+          data={data}
+          saved={saved}
+          onClose={() => setImportMode(null)}
         />
       )}
       {addPolicy && (
@@ -480,7 +521,7 @@ export default function Navigator() {
               [
                 "01",
                 "Add a source",
-                "Add a policy with its official source link, or upload a PDF or text file in the analyzer.",
+                "Import a public document or paste its text in Policies, then review and save it.",
               ],
               [
                 "02",
@@ -523,10 +564,12 @@ export default function Navigator() {
 }
 function Login({
   demoMode,
+  publicDemo,
   error,
   onLogin,
 }: {
   demoMode: boolean;
+  publicDemo: boolean;
   error: string;
   onLogin: (email: string, password: string) => Promise<void>;
 }) {
@@ -534,15 +577,12 @@ function Login({
     [password, setPassword] = useState(""),
     [busy, setBusy] = useState(false),
     [localError, setLocalError] = useState("");
-  async function login(e?: FormEvent, account?: string) {
+  async function login(e?: FormEvent) {
     e?.preventDefault();
     setBusy(true);
     setLocalError("");
     try {
-      await onLogin(
-        account || email,
-        account ? "NavigatorDemo!2026" : password,
-      );
+      await onLogin(email, password);
     } catch (e) {
       setLocalError((e as Error).message);
     } finally {
@@ -577,78 +617,48 @@ function Login({
       </section>
       <section className="login-form">
         <div className="login-box">
-          <Badge tone="green">Internal staff workspace</Badge>
+          <Badge tone="green">Staff workflow prototype</Badge>
           <h2>Welcome to Navigator</h2>
           <p className="muted">Sign in to your housing policy workspace.</p>
-          <form onSubmit={login}>
-            <Field label="Employee email">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="username"
-                placeholder="Your authorized email"
-              />
-            </Field>
-            <Field label="Password">
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-                placeholder="Enter your password"
-              />
-            </Field>
-            {(localError || error) && (
-              <div role="alert" className="error-box">
-                {localError || error}
-              </div>
-            )}
-            <button className="btn primary full" disabled={busy}>
-              {busy ? (
-                <Loader2 size={17} className="spin" />
-              ) : (
-                <>
-                  Sign in <ArrowRight size={17} />
-                </>
+          {
+            <form onSubmit={login}>
+              <Field label="Employee email">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="username"
+                  placeholder="Your authorized email"
+                />
+              </Field>
+              <Field label="Password">
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                />
+              </Field>
+              {(localError || error) && (
+                <div role="alert" className="error-box">
+                  {localError || error}
+                </div>
               )}
-            </button>
-          </form>
-          {demoMode && (
-            <div className="demo-login">
-              <div className="divider-label">EXPLORE THE STUDENT DEMO</div>
-              {process.env.NEXT_PUBLIC_SHARED_DEMO === "true" && (
-                <p>
-                  Welcome, teammates! Choose Planner to explore. This is a
-                  public practice space: use fictional information only. Edits
-                  are shared and may reset after inactivity.
-                </p>
-              )}
-              <div className="demo-role-grid">
-                {[
-                  ["staff", "Planner"],
-                  ["reviewer", "Reviewer"],
-                  ["admin", "Administrator"],
-                ].map(([id, label]) => (
-                  <button
-                    className="btn secondary"
-                    key={id}
-                    disabled={busy}
-                    onClick={() => login(undefined, `${id}@bakersfield.demo`)}
-                  >
-                    {label}
-                    <ArrowUpRight size={13} />
-                  </button>
-                ))}
-              </div>
-              <small>
-                Mock accounts · Fictional training policies · Local
-                demonstration
-              </small>
-            </div>
-          )}
+              <button className="btn primary full" disabled={busy}>
+                {busy ? (
+                  <Loader2 size={17} className="spin" />
+                ) : (
+                  <>
+                    Sign in <ArrowRight size={17} />
+                  </>
+                )}
+              </button>
+            </form>
+          }
+          <PasswordHelp />
           <p className="login-private">
             <ShieldCheck size={15} />
             Access is provisioned by an administrator. No public registration.
@@ -785,71 +795,46 @@ function HelpView({ mode }: { mode: "demo" | "live" }) {
   return (
     <>
       <Heading
-        eyebrow="HELP"
-        title="Start here."
-        description="Choose what you want to do. We’ll guide you from there."
+        eyebrow="GETTING STARTED"
+        title="From policy to action"
+        description="Start with a source, review what it means, then track the work."
       />
-      <section className="simple-section help-content">
-        <h2>Three simple ways to get started</h2>
-        <ol className="help-steps">
+      <section className="panel research-panel">
+        <ol>
           <li>
-            <h3>Find a policy</h3>
-            <p>
-              Open Policies, search by name, and choose View Policy to see its
-              explanation, status, dates, and tasks.
-            </p>
-            <Link className="text-link" href="/library">
-              View Policies
-            </Link>
+            <strong>Add a policy.</strong> In Policies, import PDF, Word or
+            text, or choose Copy &amp; Paste. Review the extracted text before
+            saving.
           </li>
           <li>
-            <h3>Understand a document</h3>
-            <p>
-              Choose an existing policy or upload a PDF or text file. Select
-              Explain This Policy, then open a supporting passage to check the
-              source.
-            </p>
-            <Link className="text-link" href="/analyzer">
-              Analyze a Policy
-            </Link>
+            <strong>Understand the source.</strong> Choose Analyze Policy.{" "}
+            {mode === "demo"
+              ? "Live AI is off; arbitrary documents receive labeled excerpts only."
+              : "Only approved source text should be sent to the AI service."}
           </li>
           <li>
-            <h3>Keep track of work</h3>
-            <p>
-              Open Tasks to see what needs to happen next. Open a task to add
-              notes, assign someone, or update its progress.
-            </p>
-            <Link className="text-link" href="/tracker">
-              View Tasks
-            </Link>
+            <strong>Review before relying.</strong> An administrator or
+            designated reviewer checks the analysis and records comments. Human
+            review is not a legal accuracy certification.
+          </li>
+          <li>
+            <strong>Create work.</strong> Turn reviewed, source-supported
+            recommendations into an action plan, or create a general task with
+            no policy.
+          </li>
+          <li>
+            <strong>Change the status.</strong> Not Started is 0%, In Progress
+            50%, Completed 100%. Blocked retains the previous value. These
+            percentages describe status.
           </li>
         </ol>
-        <GettingStarted mode={mode} />
-        <details className="simple-disclosure">
-          <summary>What do the statuses mean?</summary>
-          <p>
-            Not Reviewed: no review has started. Under Review: someone is
-            checking the policy. Action Required: there is work to do.
-            Completed: the planned work is finished.
-          </p>
-          <p>
-            Needs Verification means the information has not been confirmed from
-            an official source. A review status is separate from whether a law
-            has passed.
-          </p>
-        </details>
-        <details className="simple-disclosure">
-          <summary>Where are the other tools?</summary>
-          <p>
-            Open a policy and expand More Tools to compare versions, check City
-            procedures, or see review history. You can also find these under
-            More Tools in the menu. Administrators manage accounts in People &
-            Recent Activity.
-          </p>
-        </details>
-        <p className="muted">
-          AI explanations need human review. Sample policies are fictional. Task
-          target dates are not automatically legal deadlines.
+        <p>
+          Use My Tasks to see your responsibilities. Follow policies for update
+          notices. Contact your administrator for access or password assistance.
+        </p>
+        <p>
+          This is a university prototype. Use public documents and designated
+          test accounts until City security and privacy reviews are completed.
         </p>
       </section>
     </>
@@ -866,7 +851,16 @@ function PolicySummary({
     <article className="simple-policy">
       <div>
         <h3>{policy.title}</h3>
-        <p>{policy.category}</p>
+        <p>
+          {policy.billNumber} · {policy.category}
+        </p>
+        <p className="source-kind">
+          {policy.sample
+            ? "Fictional training sample"
+            : policy.catalog
+              ? `Official source checked ${formatDate(policy.catalog.checkedOn, true)}`
+              : "Submitted record · needs verification"}
+        </p>
         <p className="simple-status">{policy.implementationStatus}</p>
       </div>
       <button
@@ -883,16 +877,20 @@ function Dashboard({
   data,
   onSelect,
   onTask,
+  onRefresh,
 }: {
   data: Workspace;
   onSelect: (p: Policy) => void;
   onTask: (t: Partial<Task>) => void;
+  onRefresh: () => Promise<unknown>;
 }) {
-  const review = data.policies.filter((p) =>
-    ["Not Reviewed", "Under Review", "Action Required"].includes(
-      p.implementationStatus,
-    ),
-  );
+  const review = [...data.policies]
+    .sort((a, b) => Number(!!b.catalog) - Number(!!a.catalog))
+    .filter((p) =>
+      ["Not Reviewed", "Under Review", "Action Required"].includes(
+        p.implementationStatus,
+      ),
+    );
   const outstanding = data.tasks.filter((t) => t.status !== "Done");
   const upcoming = [...outstanding]
     .sort((a, b) => (a.dueDate || "9999").localeCompare(b.dueDate || "9999"))
@@ -968,6 +966,7 @@ function Dashboard({
           </div>
         </dl>
       </section>
+      <PolicyUpdates data={data} onSelect={onSelect} onRefresh={onRefresh} />
       <section className="simple-section" aria-labelledby="attention-title">
         <h2 id="attention-title">Policies That Need Attention</h2>
         {review.slice(0, 3).map((p) => (
@@ -1032,12 +1031,14 @@ function LibraryView({
           (stage === "review"
             ? ["Not Reviewed", "Under Review"].includes(p.implementationStatus)
             : p.implementationStatus === stage)) &&
-        (!verifiedOnly || p.verification === "Verified"),
+        (!verifiedOnly ||
+          ["Verified", "Source checked"].includes(p.verification)),
     )
     .sort((a, b) =>
       sort === "title"
         ? a.title.localeCompare(b.title)
-        : b.updatedAt.localeCompare(a.updatedAt),
+        : Number(!!b.catalog) - Number(!!a.catalog) ||
+          b.updatedAt.localeCompare(a.updatedAt),
     );
   return (
     <>
@@ -1046,7 +1047,16 @@ function LibraryView({
         title="Policies"
         description="Find a policy and open it to see what it means and what needs to happen next."
       >
-        <button className="btn primary" onClick={onAdd}>
+        <button
+          className="btn primary"
+          disabled={data.publicDemo}
+          title={
+            data.publicDemo
+              ? "Adding records requires a private approved workspace"
+              : undefined
+          }
+          onClick={onAdd}
+        >
           <Plus size={17} />
           Add policy
         </button>
@@ -1131,7 +1141,7 @@ function LibraryView({
                 checked={verifiedOnly}
                 onChange={(e) => setVerifiedOnly(e.target.checked)}
               />
-              Verified only
+              Source checked or staff verified
             </label>
           </div>
         </details>
@@ -1186,7 +1196,12 @@ function ClaimList({
               Supporting passage <span>· {c.verification}</span>
             </summary>
             <blockquote>{c.quote}</blockquote>
-            <small>Source: {c.sourceId}</small>
+            <small>Source: {c.sourceLabel || c.sourceId}</small>
+            {c.sourceUrl && (
+              <OfficialLink url={c.sourceUrl}>
+                Open supporting source
+              </OfficialLink>
+            )}
           </details>
         </div>
       ))}
@@ -1204,17 +1219,23 @@ function AnalysisDisplay({ analysis }: { analysis: AnalysisResult }) {
     ["changes", "02", "What changed?"],
     ["plainEnglish", "03", "In plain English"],
     ["impacts", "04", "Potential Bakersfield impacts"],
-    ["actions", "05", "Suggested staff actions"],
+    ["actions", "05", "Potential Actions for City Review"],
     ["dates", "06", "Effective dates & deadlines"],
   ];
   return (
     <>
+      <p className="notice">
+        AI-generated analysis for informational and planning purposes. Review
+        and verify against official sources before taking action.
+      </p>
       <div className="analysis-label">
         <Sparkles size={17} />
         <strong>
-          {analysis.mode === "demo"
-            ? "Demonstration result · no live AI used"
-            : "AI-generated analysis · staff review required"}
+          {analysis.mode === "prepared"
+            ? "Preprepared source-backed explanation · no live AI used"
+            : analysis.mode === "demo"
+              ? "Demonstration result · no live AI used"
+              : "AI-generated analysis · staff review required"}
         </strong>
       </div>
       {groups.map(([key, n, title]) => (
@@ -1254,340 +1275,107 @@ function Analyzer({
   saved: (s: string) => Promise<void>;
   onSelect: (p: Policy) => void;
 }) {
-  const [choice, setChoice] = useState<"existing" | "upload" | null>(null);
-  const [selectedId, setSelectedId] = useState("");
-  const [title, setTitle] = useState(""),
-    [bill, setBill] = useState(""),
-    [url, setUrl] = useState(""),
-    [category, setCategory] = useState("Permitting"),
-    [text, setText] = useState(""),
-    [file, setFile] = useState<File | null>(null),
-    [inputMode, setInputMode] = useState<"text" | "file">("file"),
+  const [id, setId] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [result, setResult] = useState<Policy | null>(null);
-  const training =
-    data.policies.find((p) => p.id === "TRAINING-101") ||
-    data.policies.find((p) => p.sourceText.includes("DEMO-PERMIT-002"));
-  function choosePolicy(p?: Policy) {
-    setSelectedId(p?.id || "");
-    setTitle(p?.title || "");
-    setBill(p?.billNumber || "");
-    setUrl(p?.sourceUrl || "");
-    setCategory(p?.category || "Permitting");
-    setText(p?.sourceText || "");
-    setInputMode("text");
-    setChoice("existing");
-    setResult(null);
-    setError("");
-  }
-  function chooseUpload() {
-    setChoice("upload");
-    setInputMode("file");
-    setSelectedId("");
-    setTitle("");
-    setBill("");
-    setUrl("");
-    setText("");
-    setFile(null);
-    setResult(null);
-    setError("");
-  }
   useEffect(() => {
-    const q = new URLSearchParams(window.location.search);
-    if (q.get("example") === "1" && training) choosePolicy(training);
-    else {
-      const p = data.policies.find((p) => p.id === q.get("policy"));
-      if (p) choosePolicy(p);
-    }
+    setId(new URLSearchParams(window.location.search).get("policy") || "");
   }, []);
-  useEffect(() => {
-    if (choice) document.getElementById("analyzer-step")?.focus();
-  }, [choice]);
-  async function analyze(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      let documentId: string | undefined;
-      if (inputMode === "file") {
-        if (!file) throw new Error("Choose a PDF or text document first.");
-        const fd = new FormData();
-        fd.append("file", file);
-        fd.append("kind", "policy");
-        const upload = await request<{ document: { id: string } }>(
-          "/api/documents",
-          fd,
-        );
-        documentId = upload.document.id;
-      }
-      const r = await request<{ policy: Policy }>("/api/analyze", {
-        title,
-        billNumber: bill,
-        sourceUrl: url,
-        category,
-        ...(documentId ? { documentId } : { text }),
-      });
-      setResult(r.policy);
-      await saved("Explanation saved in Policies.");
-      setTimeout(
-        () => document.getElementById("analysis-result")?.focus(),
-        100,
-      );
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const policy = data.policies.find((p) => p.id === id);
   return (
     <>
       <Heading
         eyebrow="POLICY EXPLANATIONS"
         title="Understand a Policy"
-        description="Choose a policy or upload a document. We will help explain it in plain language."
+        description="Choose a saved policy, check the source, and prepare an explanation for human review."
       />
-      {!choice && (
-        <section
-          className="analyzer-choices"
-          aria-label="Choose a starting point"
-        >
-          <button className="choice-button" onClick={() => choosePolicy()}>
-            <Library size={28} />
-            <strong>Choose Existing Policy</strong>
-            <span>Find a policy already in your library.</span>
-          </button>
-          <button className="choice-button" onClick={chooseUpload}>
-            <Upload size={28} />
-            <strong>Upload Document</strong>
-            <span>Use a PDF or text file from your computer.</span>
-          </button>
-          {training && (
-            <p className="example-link">
-              Just exploring?{" "}
-              <button
-                className="text-link"
-                onClick={() => choosePolicy(training)}
-              >
-                Try a guided example
-              </button>
-            </p>
-          )}
-        </section>
-      )}
-      {choice && !result && (
-        <section
-          className="panel guided-analyzer"
-          aria-labelledby="analyzer-step"
-        >
-          <div className="panel-heading">
-            <h2 id="analyzer-step" tabIndex={-1}>
-              {choice === "existing"
-                ? "Choose a policy"
-                : "Upload your document"}
-            </h2>
-            <button
-              className="btn secondary"
-              disabled={busy}
-              onClick={() => {
-                setChoice(null);
-                setError("");
-              }}
-            >
-              Back
-            </button>
-          </div>
-          <form className="panel-body form-stack" onSubmit={analyze}>
-            <fieldset disabled={busy} className="plain-fieldset form-stack">
-              {choice === "existing" ? (
-                <>
-                  <Field label="Choose Existing Policy">
-                    <select
-                      value={selectedId}
-                      onChange={(e) =>
-                        choosePolicy(
-                          data.policies.find((p) => p.id === e.target.value),
-                        )
-                      }
-                      required
-                    >
-                      <option value="">Select a policy…</option>
-                      {data.policies.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.title}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  {selectedId && (
-                    <p>
-                      {text.length >= 40
-                        ? "The saved policy text is ready to explain."
-                        : "This policy needs source text. Add it under More Options, or go Back to upload a document."}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <>
-                  {inputMode === "file" && (
-                    <Field
-                      label="Upload Document"
-                      hint="PDF with selectable text or a TXT file. Maximum size: 5 MB."
-                    >
-                      <input
-                        type="file"
-                        accept=".pdf,.txt"
-                        required
-                        onChange={(e) => {
-                          const chosen = e.target.files?.[0] || null;
-                          setFile(chosen);
-                          if (chosen && !title)
-                            setTitle(chosen.name.replace(/\.[^.]+$/, ""));
-                        }}
-                      />
-                    </Field>
-                  )}
-                  <Field label="Policy name">
-                    <input
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      required
-                      maxLength={240}
-                      placeholder="Give this policy a short, clear name"
-                    />
-                  </Field>
-                </>
-              )}
-              <details className="simple-disclosure" key={choice}>
-                <summary>More Options</summary>
-                <div className="form-stack">
-                  <Field label="Bill or document number (optional)">
-                    <input
-                      value={bill}
-                      onChange={(e) => setBill(e.target.value)}
-                      maxLength={100}
-                    />
-                  </Field>
-                  <Field label="Policy category">
-                    <select
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                    >
-                      {CATEGORIES.map((c) => (
-                        <option key={c}>{c}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field
-                    label="Official source link (optional)"
-                    hint="We save this link for review. Include the document text as well."
-                  >
-                    <input
-                      type="url"
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      placeholder="https://…"
-                    />
-                  </Field>
-                  {choice === "upload" && (
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={inputMode === "text"}
-                        onChange={(e) =>
-                          setInputMode(e.target.checked ? "text" : "file")
-                        }
-                      />
-                      Paste text instead of uploading a file
-                    </label>
-                  )}
-                  {inputMode === "text" && (
-                    <Field label="Policy text">
-                      <textarea
-                        rows={8}
-                        value={text}
-                        onChange={(e) => setText(e.target.value)}
-                        maxLength={60000}
-                        placeholder="Paste at least 40 characters from the policy."
-                      />
-                    </Field>
-                  )}
-                </div>
-              </details>
-            </fieldset>
-            <p className="privacy-note">
-              {data.mode === "live"
-                ? "This text will be sent to OpenAI for a draft explanation. Use only approved documents."
-                : process.env.NEXT_PUBLIC_SHARED_DEMO === "true"
-                  ? "Use fictional documents only. This demo is shared with everyone who visits and does not use live AI."
-                  : "This is a demonstration. No document text is sent to an AI service."}
-            </p>
-            {error && (
-              <div className="error-box" role="alert">
-                {error}
-              </div>
+      <section className="panel research-panel form-stack">
+        <Field label="Choose Existing Policy">
+          <select
+            value={id}
+            onChange={(e) => {
+              setId(e.target.value);
+              setResult(null);
+            }}
+          >
+            <option value="">Select a saved policy…</option>
+            {data.policies.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.title}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Link className="text-link" href="/library">
+          Import a document or paste policy text in Policies
+        </Link>
+        {data.mode === "demo" ? (
+          <p className="notice">
+            Live AI is off. For most documents, this mode provides source
+            excerpts only; it cannot generate useful summaries or
+            recommendations. Prepared public-source explanations, when
+            available, are labeled separately.
+          </p>
+        ) : (
+          <p className="notice">
+            This policy text will be sent to OpenAI for a draft explanation. Use
+            only documents approved for that service.
+          </p>
+        )}
+        {policy && (
+          <p>
+            {policy.sourceText.length.toLocaleString()} characters · Uploaded
+            version {policy.version} ·{" "}
+            {policy.sourceUrl ? (
+              <OfficialLink url={policy.sourceUrl}>
+                Original source
+              </OfficialLink>
+            ) : (
+              "No source link provided"
             )}
-            <button
-              className="btn primary full"
-              disabled={
-                busy ||
-                !title.trim() ||
-                (inputMode === "file" ? !file : text.trim().length < 40)
-              }
-            >
-              {busy ? (
-                <>
-                  <Loader2 size={20} className="spin" />
-                  Preparing your explanation…
-                </>
-              ) : (
-                "Explain This Policy"
-              )}
-            </button>
-            {choice === "existing" && (
-              <p className="muted">
-                The new explanation is saved as a separate policy record. Your
-                original stays available.
-              </p>
-            )}
-          </form>
-        </section>
-      )}
+          </p>
+        )}
+        <button
+          className="btn primary"
+          disabled={!policy || busy}
+          onClick={async () => {
+            if (!policy) return;
+            setBusy(true);
+            setError("");
+            try {
+              const r = await request<{ policy: Policy }>("/api/analyze", {
+                policyId: policy.id,
+              });
+              setResult(r.policy);
+              await saved("Analysis saved for human review.");
+            } catch (e) {
+              setError((e as Error).message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? "Preparing analysis…" : "Analyze Policy"}
+        </button>
+        {error && (
+          <p className="error-box" role="alert">
+            {error}
+          </p>
+        )}
+        {!data.policies.length && (
+          <p>
+            Save your first public-source policy in Policies to get started.
+          </p>
+        )}
+      </section>
       {result?.analysis && (
-        <section
-          className="panel guided-analyzer"
-          id="analysis-result"
-          tabIndex={-1}
-          aria-label="Policy explanation result"
-        >
-          <div className="panel-heading">
-            <div>
-              <h2>Your policy explained</h2>
-              <p>{result.title}</p>
-            </div>
-          </div>
-          <div className="panel-body">
-            <AnalysisDisplay analysis={result.analysis} />
-            <div className="next-step">
-              <h3>Next: view your policy</h3>
-              <p>
-                Find the saved explanation, important dates, tasks, and further
-                tools in the policy details.
-              </p>
-              <button className="btn primary" onClick={() => onSelect(result)}>
-                View Policy
-              </button>
-            </div>
-            <button
-              className="text-link"
-              onClick={() => {
-                setResult(null);
-                setChoice(null);
-              }}
-            >
-              Explain Another Policy
-            </button>
-          </div>
+        <section className="panel research-panel">
+          <h2>{result.title}</h2>
+          <AnalysisDisplay analysis={result.analysis} />
+          <button className="btn primary" onClick={() => onSelect(result)}>
+            View Policy and Review Analysis
+          </button>
         </section>
       )}
     </>
@@ -1638,6 +1426,7 @@ function Tracker({
           />
         </div>
         <select
+          disabled={data.publicDemo}
           aria-label="Filter tasks by department"
           value={department}
           onChange={(e) => setDepartment(e.target.value)}
@@ -1682,7 +1471,7 @@ function Tracker({
                     <select
                       aria-label={`Status for ${t.title}`}
                       value={t.status}
-                      disabled={busyId === t.id}
+                      disabled={data.publicDemo || busyId === t.id}
                       onChange={async (e) => {
                         setBusyId(t.id);
                         try {
@@ -2109,7 +1898,7 @@ function PolicyDetail({
     [analysis, setAnalysis] = useState<AnalysisResult | null>(p.analysis),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const reviewer = data.user.role !== "STAFF";
+  const reviewer = ["ADMIN", "REVIEWER"].includes(data.user.role);
   async function save(verify = false) {
     setBusy(true);
     setError("");
@@ -2186,6 +1975,12 @@ function PolicyDetail({
         )}
         {tab === "overview" && (
           <div className="policy-overview">
+            {p.catalog && (
+              <p className="notice">
+                Preprepared source-backed explanation · no live AI · source
+                checks are not City legal approval.
+              </p>
+            )}
             <section>
               <h3>Overview</h3>
               {p.analysis ? (
@@ -2217,11 +2012,27 @@ function PolicyDetail({
                 <p>{p.impact || "The local impact still needs review."}</p>
               )}
             </section>
+            <PolicyRecords
+              policy={p}
+              data={data}
+              saved={saved}
+              onArchived={onClose}
+            />
+            <PolicyResearch policy={p} />
+            <PolicyWorkflow
+              key={`${p.id}-${p.version}-${p.reviewStatus}`}
+              policy={p}
+              data={data}
+              saved={saved}
+            />
+            {data.publicDemo && p.catalog && (
+              <DemoActions policy={p} saved={saved} />
+            )}
             <section>
               <h3>Current Status</h3>
               <dl className="detail-facts">
                 <div>
-                  <dt>Review status</dt>
+                  <dt>Implementation stage</dt>
                   <dd>{p.implementationStatus}</dd>
                 </div>
                 <div>
@@ -2239,13 +2050,25 @@ function PolicyDetail({
               </dl>
               <button
                 className="btn secondary"
+                disabled={data.publicDemo || data.user.role === "VIEWER"}
+                title={
+                  data.publicDemo
+                    ? "Use the practice actions above; full editing requires a private workspace."
+                    : undefined
+                }
                 onClick={() => setTab("review")}
               >
-                Review or Update Status
+                Update Implementation or Source Verification
               </button>
             </section>
             <section>
               <h3>Important Dates</h3>
+              {p.catalog && (
+                <p>
+                  Missing dates were not verified in this brief. Guidance
+                  publication dates are not law effective dates.
+                </p>
+              )}
               <dl className="detail-facts">
                 <div>
                   <dt>Effective date</dt>
@@ -2270,21 +2093,14 @@ function PolicyDetail({
               {data.tasks
                 .filter((t) => t.policyId === p.id)
                 .map((t) => (
-                  <article className="simple-task" key={t.id}>
-                    <button onClick={() => onTask(t)}>{t.title}</button>
-                    <p>
-                      {t.status} ·{" "}
-                      {t.dueDate
-                        ? `Due ${formatDate(t.dueDate, true)}`
-                        : "No due date set"}
-                    </p>
-                  </article>
+                  <EmployeeTaskCard key={t.id} task={t} data={data} onTask={onTask} saved={saved}/>
                 ))}
               {!data.tasks.some((t) => t.policyId === p.id) && (
                 <p>No tasks have been added for this policy.</p>
               )}
               <button
                 className="btn secondary"
+                disabled={data.user.role === "VIEWER"}
                 onClick={() =>
                   onTask({ policyId: p.id, department: p.department })
                 }
@@ -2395,7 +2211,7 @@ function PolicyDetail({
             </pre>
           </>
         )}
-        {tab === "review" && (
+        {tab === "review" && data.user.role !== "VIEWER" && (
           <div className="form-stack">
             <div className="notice">
               <ShieldCheck size={18} />
@@ -2451,11 +2267,13 @@ function PolicyDetail({
               />
             </Field>
             <details className="edit-section">
-              <summary>Correct source text or analysis</summary>
+              <summary>Review source and correct analysis</summary>
+              <p>To correct source text or its URL, import an updated version in Policies. Previous evidence will be preserved.</p>
               <div className="form-stack">
                 <Field label="Official source URL">
                   <input
                     type="url"
+                    readOnly
                     value={sourceUrl}
                     onChange={(e) => setSourceUrl(e.target.value)}
                   />
@@ -2463,6 +2281,7 @@ function PolicyDetail({
                 <Field label="Supporting source text">
                   <textarea
                     rows={8}
+                    readOnly
                     value={source}
                     onChange={(e) => setSource(e.target.value)}
                     maxLength={60000}
@@ -3082,8 +2901,17 @@ function Settings({
                     value={form.role}
                     onChange={(e) => setForm({ ...form, role: e.target.value })}
                   >
-                    {["STAFF", "REVIEWER", "ADMIN"].map((r) => (
-                      <option key={r}>{r}</option>
+                    {["STAFF", "REVIEWER", "ADMIN", "VIEWER"].map((r) => (
+                      <option key={r} value={r}>
+                        {
+                          {
+                            STAFF: "Employee",
+                            REVIEWER: "Reviewer",
+                            ADMIN: "Administrator",
+                            VIEWER: "Viewer",
+                          }[r]
+                        }
+                      </option>
                     ))}
                   </select>
                 </Field>
@@ -3094,7 +2922,8 @@ function Settings({
             </form>
           )}
           <div className="role-help">
-            <strong>Staff</strong> research and manage tasks.{" "}
+            <strong>Employees</strong> research and manage tasks.{" "}
+            <strong>Viewers</strong> have read-only access.{" "}
             <strong>Reviewers</strong> can verify interpretations.{" "}
             <strong>Administrators</strong> also manage employee access.
           </div>
@@ -3122,10 +2951,20 @@ function Settings({
                     void userUpdate(u, { role: e.target.value as User["role"] })
                   }
                 >
-                  {["STAFF", "REVIEWER", "ADMIN"].map((r) => (
-                    <option key={r}>{r}</option>
+                  {["STAFF", "REVIEWER", "ADMIN", "VIEWER"].map((r) => (
+                    <option key={r} value={r}>
+                      {
+                        {
+                          STAFF: "Employee",
+                          REVIEWER: "Reviewer",
+                          ADMIN: "Administrator",
+                          VIEWER: "Viewer",
+                        }[r]
+                      }
+                    </option>
                   ))}
                 </select>
+                <EmployeeReset user={u} />
                 <button
                   disabled={busy || u.id === data.user.id}
                   className={`btn ${u.active ? "secondary" : "primary"}`}
@@ -3138,6 +2977,7 @@ function Settings({
           </div>
         </section>
       )}
+      {data.user.role === "ADMIN" && <ArchivedPolicies saved={saved} />}
       <section className="panel">
         <div className="panel-heading">
           <div>

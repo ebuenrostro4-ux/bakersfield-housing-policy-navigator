@@ -6,16 +6,29 @@ import {
   DEMO_PROCEDURE_TEXT,
 } from "./fixtures";
 
+import {
+  POLICY_CATALOG,
+  catalogSource,
+  preparedAnalysis,
+  SOURCE_CHECKED_ON,
+} from "./policy-catalog";
+
 let pending: Promise<void> | undefined;
 
 /** Explicitly opt-in training data only. Never creates accounts outside demo mode. */
 export async function ensureSeed() {
-  if (process.env.DEMO_MODE !== "true") return;
+  if (
+    process.env.DEMO_MODE !== "true" ||
+    process.env.ALLOW_TRAINING_SEED !== "true"
+  )
+    return;
   if (!pending)
-    pending = seedDemo().catch((error) => {
-      pending = undefined;
-      throw error;
-    });
+    pending = seedDemo()
+      .then(seedCatalog)
+      .catch((error) => {
+        pending = undefined;
+        throw error;
+      });
   await pending;
 }
 
@@ -24,7 +37,14 @@ async function seedDemo() {
   await db.$transaction(
     async (tx) => {
       if (await tx.audit.findUnique({ where: { id: "demo-seed-v1" } })) return;
-      const passwordHash = hashPassword("NavigatorDemo!2026");
+      const passwordHash = hashPassword(
+        process.env.TRAINING_PASSWORD ||
+          (() => {
+            throw new Error(
+              "Set TRAINING_PASSWORD for isolated test fixtures.",
+            );
+          })(),
+      );
       for (const user of [
         {
           id: "demo-admin",
@@ -228,4 +248,52 @@ async function seedDemo() {
     },
     { timeout: 20_000 },
   );
+}
+
+// A separate idempotent seed adds genuine records to existing workspaces without overwriting edits.
+async function seedCatalog() {
+  await db.$transaction(async (tx) => {
+    if (
+      await tx.audit.findUnique({
+        where: { id: "source-catalog-2026-11-05-v1" },
+      })
+    )
+      return;
+    for (const entry of POLICY_CATALOG) {
+      await tx.policy.upsert({
+        where: { id: entry.id },
+        update: {},
+        create: {
+          id: entry.id,
+          title: entry.title,
+          billNumber: entry.billNumber,
+          category: entry.category,
+          legislativeStatus: entry.legislativeStatus,
+          sourceUrl: entry.sourceUrl,
+          sourceText: catalogSource(entry),
+          sample: false,
+          verification: "Source checked",
+          lastVerifiedAt: new Date(SOURCE_CHECKED_ON + "T12:00:00Z"),
+          effectiveDate: entry.effectiveDate
+            ? new Date(entry.effectiveDate + "T00:00:00Z")
+            : null,
+          analysisJson: JSON.stringify(preparedAnalysis(entry)),
+          impact: entry.action,
+          reviewNote:
+            "Prepared research snapshot. Local applicability awaits City review.",
+        },
+      });
+    }
+    await tx.audit.create({
+      data: {
+        id: "source-catalog-2026-11-05-v1",
+        actor: "Presentation catalog",
+        action: "Source-backed catalog added",
+        entityType: "Workspace",
+        entityId: "catalog",
+        detail:
+          "Five genuine HCD law/guidance records. Sources checked November 5, 2026; import time is not a legislative change or new verification.",
+      },
+    });
+  });
 }

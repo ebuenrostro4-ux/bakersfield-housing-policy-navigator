@@ -6,30 +6,35 @@
     "dev": "next dev --webpack --hostname 127.0.0.1",
     "build": "prisma generate && next build --webpack",
     "start": "next start --hostname 127.0.0.1",
-    "db:setup": "node scripts/prepare-db.mjs && prisma generate && prisma db push && node --import tsx prisma/seed.ts",
+    "db:setup": "prisma generate && node --env-file=.env scripts/migrate.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
-    "test:api": "node tests/api-smoke.mjs"
+    "test:api": "node tests/employee-smoke.mjs",
+    "start:employee": "node scripts/start-employee.mjs",
+    "db:migrate": "node scripts/migrate.mjs",
+    "db:backup": "node scripts/backup.mjs",
+    "admin:bootstrap": "node scripts/bootstrap-admin.mjs"
   },
   "dependencies": {
-    "next": "^16.0.0",
+    "@prisma/client": "6.19.3",
+    "@tailwindcss/postcss": "^4.1.0",
+    "lucide-react": "^0.468.0",
+    "mammoth": "^1.13.0",
+    "next": "^16.4.1",
+    "openai": "^6.0.0",
+    "pdf-parse": "2.4.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "@prisma/client": "6.19.3",
-    "openai": "^6.0.0",
-    "zod": "^3.25.0",
-    "pdf-parse": "2.4.5",
-    "lucide-react": "^0.468.0",
     "tailwindcss": "^4.1.0",
-    "@tailwindcss/postcss": "^4.1.0"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
-    "prisma": "6.19.3",
-    "typescript": "^5.9.0",
-    "tsx": "^4.20.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0"
+    "@types/react-dom": "^19.0.0",
+    "prisma": "6.19.3",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
   },
   "engines": {
     "node": ">=22.12.0"

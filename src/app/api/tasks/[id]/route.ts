@@ -1,3 +1,4 @@
+import { requirePrivateWorkspace } from "@/lib/public-demo";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
@@ -17,6 +18,7 @@ export async function PATCH(
 ) {
   try {
     requireSameOrigin(request);
+    requirePrivateWorkspace();
     const user = await requireUser(request);
     const { id } = await context.params;
     const before = await db.task.findUnique({ where: { id } });
@@ -27,7 +29,27 @@ export async function PATCH(
       before,
     );
     const task = await db.$transaction(async (tx) => {
+      const current = await tx.task.findUnique({ where: { id } });
+      if (
+        !current ||
+        current.updatedAt.getTime() !== before.updatedAt.getTime()
+      )
+        throw new ApiError(
+          409,
+          "Task changed while saving. Refresh and try again.",
+        );
       const updated = await tx.task.update({ where: { id }, data });
+      if (updated.assigneeId)
+        await tx.notification.upsert({
+          where: { key: `assigned-${updated.id}-${updated.assigneeId}` },
+          update: {},
+          create: {
+            userId: updated.assigneeId,
+            key: `assigned-${updated.id}-${updated.assigneeId}`,
+            title: `Assigned: ${updated.title}`,
+            href: "/tracker",
+          },
+        });
       await audit(tx, {
         actor: user.name,
         action: "Implementation task updated",

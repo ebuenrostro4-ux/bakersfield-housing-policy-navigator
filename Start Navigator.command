@@ -32,11 +32,9 @@ if /usr/sbin/lsof -nP -iTCP:3000 -sTCP:LISTEN >/dev/null 2>&1; then
   read -r -p 'Press Return to close.'
   exit 0
 fi
-"$navigator_node" scripts/prepare-db.mjs
 "$navigator_node" node_modules/prisma/build/index.js generate
-"$navigator_node" node_modules/prisma/build/index.js db push --skip-generate
-"$navigator_node" --import tsx prisma/seed.ts
+"$navigator_node" --env-file=.env scripts/migrate.mjs
 printf '\nNavigator is starting. Open http://127.0.0.1:3000\n'
-printf 'Choose Planner, Reviewer, or Administrator to explore the demo.\n'
+printf 'Sign in with an administrator-provisioned account. See docs/EMPLOYEE_WORKSPACE.md for setup.\n'
 printf 'Keep this window open. Press Control-C to stop the app.\n\n'
 exec "$navigator_node" node_modules/next/dist/bin/next dev --webpack --hostname 127.0.0.1 --port 3000

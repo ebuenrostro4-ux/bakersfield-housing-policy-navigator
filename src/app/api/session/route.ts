@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+import { isPublicDemo } from "@/lib/public-demo";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
@@ -22,8 +24,7 @@ import {
 import { ensureSeed } from "@/lib/seed";
 
 export const runtime = "nodejs";
-const attempts = new Map<string, { count: number; expires: number }>();
-const dummyHash = hashPassword("unusable-placeholder-password");
+const dummyHash = hashPassword(randomBytes(32).toString("hex"));
 
 export async function GET(request: Request) {
   try {
@@ -38,7 +39,8 @@ export async function GET(request: Request) {
       {
         user,
         mode: process.env.AI_MODE === "live" ? "live" : "demo",
-        demoMode: process.env.DEMO_MODE === "true",
+        demoMode: false,
+        publicDemo: isPublicDemo(),
       },
       { headers: { "Cache-Control": "no-store" } },
     );
@@ -53,20 +55,23 @@ export async function POST(request: Request) {
     const body = await readJson(request, 10_000);
     const email = stringValue(body.email, "Email", 254, true).toLowerCase();
     const password = stringValue(body.password, "Password", 200, true);
-    const now = Date.now();
-    for (const [key, attempt] of attempts)
-      if (attempt.expires < now) attempts.delete(key);
-    const attempt = attempts.get(email) ?? {
-      count: 0,
-      expires: now + 15 * 60 * 1000,
-    };
-    if (attempt.count >= 5 || attempts.size > 10_000)
+    const now = new Date();
+    const key = tokenHash(email);
+    await db.loginAttempt.deleteMany({ where: { expiresAt: { lt: now } } });
+    const attempt = await db.loginAttempt.upsert({
+      where: { key },
+      create: {
+        key,
+        count: 1,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      },
+      update: { count: { increment: 1 } },
+    });
+    if (attempt.count > 5)
       throw new ApiError(
         429,
-        "Too many sign-in attempts. Try again in 15 minutes.",
+        "Too many sign-in attempts. Try again in 15 minutes or contact your administrator.",
       );
-    attempt.count++;
-    attempts.set(email, attempt);
     await ensureSeed();
     const user = await db.user.findUnique({ where: { email } });
     const validPassword = verifyPassword(
@@ -77,6 +82,7 @@ export async function POST(request: Request) {
       !validPassword ||
       !user ||
       !user.active ||
+      (isPublicDemo() && (user.id !== "demo-staff" || user.role !== "STAFF")) ||
       (user.email.endsWith("@bakersfield.demo") &&
         process.env.DEMO_MODE !== "true")
     )
@@ -85,7 +91,7 @@ export async function POST(request: Request) {
         "Email or password is incorrect, or the account is unavailable.",
       );
     const token = await createSession(user.id);
-    attempts.delete(email);
+    await db.loginAttempt.deleteMany({ where: { key } });
     await audit(db, {
       actor: user.name,
       action: "Signed in",

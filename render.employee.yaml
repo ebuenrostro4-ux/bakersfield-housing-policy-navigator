@@ -1,0 +1,36 @@
+# REVIEW TEMPLATE ONLY: do not create a second service or activate a paid plan without approval.
+# Apply equivalent settings to the EXISTING Render service to retain its URL.
+# See docs/EMPLOYEE_WORKSPACE.md for backup, cutover, bootstrap and rollback.
+services:
+  - type: web
+    name: bakersfield-housing-policy-navigator-iw1k
+    runtime: node
+    plan: starter
+    branch: main
+    autoDeployTrigger: off
+    buildCommand: npx --yes pnpm@11.25.0 install --frozen-lockfile && npx --yes pnpm@11.25.0 run build
+    startCommand: node scripts/start-employee.mjs
+    healthCheckPath: /api/session
+    disk:
+      name: employee-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 24.14.0
+      - key: DATABASE_URL
+        value: file:/var/data/navigator.db
+      - key: APP_URL
+        value: https://bakersfield-housing-policy-navigator-iw1k.onrender.com
+      - key: PUBLIC_DEMO
+        value: "false"
+      - key: DEMO_MODE
+        value: "false"
+      - key: ALLOW_TRAINING_SEED
+        value: "false"
+      - key: AI_MODE
+        value: demo
+      - key: NEXT_PUBLIC_SHARED_DEMO
+        value: "false"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"

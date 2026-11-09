@@ -1,3 +1,4 @@
+import { isPublicDemo } from "./public-demo";
 import {
   createHash,
   randomBytes,
@@ -53,11 +54,19 @@ export async function requireUser(_request?: Request): Promise<User> {
     !session ||
     session.expiresAt <= new Date() ||
     !session.user.active ||
-    !["ADMIN", "STAFF", "REVIEWER"].includes(session.user.role) ||
+    (isPublicDemo() &&
+      (session.user.id !== "demo-staff" || session.user.role !== "STAFF")) ||
+    !["ADMIN", "STAFF", "REVIEWER", "VIEWER"].includes(session.user.role) ||
     (session.user.email.endsWith("@bakersfield.demo") &&
       process.env.DEMO_MODE !== "true")
   )
     throw new ApiError(401, "Your session has expired. Please sign in again.");
+  if (
+    _request &&
+    !["GET", "HEAD", "OPTIONS"].includes(_request.method) &&
+    session.user.role === "VIEWER"
+  )
+    throw new ApiError(403, "Viewer accounts have read-only access.");
   return publicUser(session.user);
 }
 
