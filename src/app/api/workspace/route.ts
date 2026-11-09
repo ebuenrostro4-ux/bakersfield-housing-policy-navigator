@@ -1,3 +1,4 @@
+import { freePreviewEnabled, previewWorkspace } from "@/lib/free-preview";
 import { employeeNotifications } from "@/lib/notifications";
 import { isPublicDemo } from "@/lib/public-demo";
 import { NextResponse } from "next/server";
@@ -9,6 +10,10 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   try {
     const user = await requireUser(request);
+    if (freePreviewEnabled())
+      return NextResponse.json(previewWorkspace(), {
+        headers: { "Cache-Control": "no-store" },
+      });
     const hidden = await db.policy.findMany({
       where: { sample: true },
       select: { id: true },

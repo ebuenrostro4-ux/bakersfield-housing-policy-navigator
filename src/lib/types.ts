@@ -128,6 +128,7 @@ export type ComparisonResult = {
   disclaimer: string;
 };
 export type Workspace = {
+  freePreview?: boolean;
   user: User;
   mode: "demo" | "live";
   policies: Policy[];

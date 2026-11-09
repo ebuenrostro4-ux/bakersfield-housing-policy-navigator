@@ -1,3 +1,4 @@
+import { freePreviewEnabled, previewVisitor } from "./free-preview";
 import { isPublicDemo } from "./public-demo";
 import {
   createHash,
@@ -42,6 +43,19 @@ export function publicUser(user: DBUser): User {
 }
 
 export async function requireUser(_request?: Request): Promise<User> {
+  if (freePreviewEnabled()) {
+    if (
+      _request?.method === "GET" &&
+      ["/api/session", "/api/workspace"].includes(
+        new URL(_request.url).pathname,
+      )
+    )
+      return previewVisitor;
+    throw new ApiError(
+      403,
+      "This public preview exposes only its public policy catalog. Employee data and editing require the local employee workspace.",
+    );
+  }
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token || !/^[a-f0-9]{64}$/.test(token))

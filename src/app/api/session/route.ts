@@ -1,3 +1,8 @@
+import {
+  rejectFreePreview,
+  freePreviewEnabled,
+  previewVisitor,
+} from "@/lib/free-preview";
 import { randomBytes } from "node:crypto";
 import { isPublicDemo } from "@/lib/public-demo";
 import { NextResponse } from "next/server";
@@ -28,6 +33,16 @@ const dummyHash = hashPassword(randomBytes(32).toString("hex"));
 
 export async function GET(request: Request) {
   try {
+    if (freePreviewEnabled())
+      return NextResponse.json(
+        {
+          user: previewVisitor,
+          mode: "demo",
+          demoMode: false,
+          publicDemo: false,
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
     await ensureSeed();
     let user = null;
     try {
@@ -52,6 +67,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     requireSameOrigin(request);
+    rejectFreePreview();
     const body = await readJson(request, 10_000);
     const email = stringValue(body.email, "Email", 254, true).toLowerCase();
     const password = stringValue(body.password, "Password", 200, true);
@@ -116,6 +132,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     requireSameOrigin(request);
+    rejectFreePreview();
     const token = (await cookies()).get(SESSION_COOKIE)?.value;
     if (token)
       await db.session.deleteMany({ where: { tokenHash: tokenHash(token) } });

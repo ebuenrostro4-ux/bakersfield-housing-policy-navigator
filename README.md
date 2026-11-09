@@ -1,5 +1,8 @@
 # Bakersfield Housing Policy Navigator
 
+**Current public release: [Free meeting demonstration](docs/MEETING_DEMO.md).** Exactly two interactive fictional policies, no employee login, browser-saved tasks and public imports. No paid services. The employee setup below is retained for local/future use.
+
+
 An employee-focused university SPARKS prototype for imported housing-policy evidence, human-reviewed analysis and task tracking. City approval or production readiness is not implied.
 
 **Start with [the employee setup and deployment guide](docs/EMPLOYEE_WORKSPACE.md).** It covers first-admin setup, employee access, imports, analysis limits, task progress, document history, backups, costs and safe Render cutover.

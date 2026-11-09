@@ -1,4 +1,5 @@
 "use client";
+import MeetingDemo from "./meeting-demo";
 import { useState, useEffect, useCallback, FormEvent } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -255,6 +256,7 @@ export default function Navigator() {
         }}
       />
     );
+  if (data.freePreview) return <MeetingDemo />;
   return (
     <div className="app-shell">
       <a href="#main-content" className="skip-link">
@@ -284,7 +286,9 @@ export default function Navigator() {
         </Link>
         <div className="workspace-label">
           <span className="workspace-dot" />
-          AUTHORIZED WORKSPACE
+          {data.freePreview
+            ? "PUBLIC READ-ONLY PREVIEW"
+            : "AUTHORIZED WORKSPACE"}
         </div>
         <nav aria-label="Main navigation">
           {navigation.map((n) => (
@@ -381,12 +385,16 @@ export default function Navigator() {
             <span className="mode-dot" />
             {data.mode === "demo" ? (
               <>
-                <strong>University prototype</strong>
+                <strong>
+                  {data.freePreview
+                    ? "Free read-only preview"
+                    : "University prototype"}
+                </strong>
                 <span className="banner-detail">
                   {" "}
                   {publicDemo
                     ? "· Source-backed policy briefs + fictional practice actions. No uploads or private information. Shared edits may reset on restart."
-                    : "· Authorized test accounts. Live AI is off. Use public source documents."}
+                    : "· Live AI is off. Employee editing is available in the local workspace."}
                 </span>
               </>
             ) : (
@@ -417,8 +425,26 @@ export default function Navigator() {
               </button>
             </div>
           )}
-          <Notifications data={data} saved={saved} />
-          {view === "dashboard" && (
+          {!data.freePreview && <Notifications data={data} saved={saved} />}
+          {view === "dashboard" && data.freePreview && (
+            <section className="panel research-panel">
+              <h1>Housing Policy Navigator</h1>
+              <p>
+                Explore five real housing law and guidance briefs and their
+                supporting public sources. This university preview is free and
+                read-only. Employee login, imports, human review and task
+                editing remain in the local employee workspace.
+              </p>
+              <p>
+                Sources were checked November 5, 2026. These are prepared
+                explanations, not live AI or legal advice.
+              </p>
+              <Link className="btn primary" href="/library">
+                Explore Real Policies
+              </Link>
+            </section>
+          )}
+          {view === "dashboard" && !data.freePreview && (
             <EmployeeHome
               data={data}
               onSelect={setSelected}
@@ -2093,7 +2119,13 @@ function PolicyDetail({
               {data.tasks
                 .filter((t) => t.policyId === p.id)
                 .map((t) => (
-                  <EmployeeTaskCard key={t.id} task={t} data={data} onTask={onTask} saved={saved}/>
+                  <EmployeeTaskCard
+                    key={t.id}
+                    task={t}
+                    data={data}
+                    onTask={onTask}
+                    saved={saved}
+                  />
                 ))}
               {!data.tasks.some((t) => t.policyId === p.id) && (
                 <p>No tasks have been added for this policy.</p>
@@ -2268,7 +2300,10 @@ function PolicyDetail({
             </Field>
             <details className="edit-section">
               <summary>Review source and correct analysis</summary>
-              <p>To correct source text or its URL, import an updated version in Policies. Previous evidence will be preserved.</p>
+              <p>
+                To correct source text or its URL, import an updated version in
+                Policies. Previous evidence will be preserved.
+              </p>
               <div className="form-stack">
                 <Field label="Official source URL">
                   <input

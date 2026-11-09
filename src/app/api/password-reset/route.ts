@@ -1,3 +1,8 @@
+import {
+  rejectFreePreview,
+  freePreviewEnabled,
+  previewVisitor,
+} from "@/lib/free-preview";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
@@ -13,6 +18,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     requireSameOrigin(request);
+    rejectFreePreview();
     const body = await readJson(request, 4000);
     if (body.token) {
       const token = stringValue(body.token, "Reset token", 128, true),
