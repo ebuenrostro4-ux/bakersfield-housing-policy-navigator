@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState, FormEvent } from "react";
 import Link from "next/link";
+import RestoredWelcome from "./restored-welcome";
+import {LayoutDashboard,Library,Sparkles,ListChecks,LogOut,Menu,X,Building2,ChevronRight} from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Brand, Modal, Field, OfficialLink, formatDate } from "./ui";
 import { TaskProgress, employeeRequest } from "./employee";
@@ -63,6 +65,9 @@ export default function MeetingDemo() {
           : path === "/analyzer"
             ? "analyze"
             : "home";
+  const [entered,setEntered]=useState(false),[entryReady,setEntryReady]=useState(false),[demoRole,setDemoRole]=useState("Planner"),[mobile,setMobile]=useState(false);
+  useEffect(()=>{const role=sessionStorage.getItem("navigator-demo-entry-v1");if(role){setDemoRole(role);setEntered(true);}setEntryReady(true);},[]);
+  useEffect(()=>{const close=(e:KeyboardEvent)=>{if(e.key==="Escape")setMobile(false);};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close);},[]);
   const [state, setState] = useState<MeetingState | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -107,7 +112,8 @@ export default function MeetingDemo() {
       setBusy(false);
     }
   }
-  if (!state)
+  if(entryReady&&!entered)return <RestoredWelcome demoMode error="" onLogin={async(email)=>{const roles:Record<string,string>={"staff@bakersfield.demo":"Planner","reviewer@bakersfield.demo":"Reviewer","admin@bakersfield.demo":"Administrator"};const role=roles[email];if(!role)throw new Error("Employee sign-in is not enabled here. Choose a demo button below to explore.");sessionStorage.setItem("navigator-demo-entry-v1",role);setDemoRole(role);setEntered(true);}}/>;
+  if (!state||!entryReady)
     return (
       <main className="research-panel">
         <Brand />
@@ -190,28 +196,20 @@ export default function MeetingDemo() {
     );
   }
   return (
-    <div className="meeting-shell">
-      <a className="skip-link" href="#meeting-main">
-        Skip to content
-      </a>
-      <header className="meeting-header">
-        <Brand />
-        <nav aria-label="Main navigation">
-          {[
-            ["/", "Home"],
-            ["/library", "Policies"],
-            ["/analyzer", "Analyze Policy"],
-            ["/tracker", "Tasks"],
-          ].map(([url, label]) => (
-            <Link key={url} href={url}>
-              {label}
-            </Link>
-          ))}
-        </nav>
-        <button className="btn secondary" onClick={() => setReset(true)}>
-          Reset Demo
-        </button>
-      </header>
+    <div className="app-shell meeting-shell restored-meeting">
+      <a className="skip-link" href="#meeting-main">Skip to content</a>
+      {mobile&&<button className="nav-scrim" aria-label="Close navigation" onClick={()=>setMobile(false)}/>}
+      <aside id="meeting-sidebar" className={`sidebar ${mobile?'open':''}`}>
+        <button className="btn secondary sidebar-close" onClick={()=>setMobile(false)}><X size={20}/>Close Menu</button>
+        <Link href="/" className="brand-link" aria-label="Housing Policy Navigator home"><Brand/></Link>
+        <div className="workspace-label"><span className="workspace-dot"/>DEMONSTRATION WORKSPACE</div>
+        <nav aria-label="Main navigation">{[['/','Home',LayoutDashboard],['/library','Policies',Library],['/analyzer','Analyze a Policy',Sparkles],['/tracker','Tasks',ListChecks]].map(([url,label,Icon])=>{const Glyph=Icon as typeof LayoutDashboard;return <Link key={url as string} href={url as string} className={`nav-item ${path===url?'active':''}`} aria-current={path===url?'page':undefined} onClick={()=>setMobile(false)}><Glyph size={19}/><span>{label as string}</span></Link>;})}</nav>
+        <details className="sidebar-more"><summary>More Tools</summary><button className="btn secondary" onClick={()=>{setReset(true);setMobile(false);}}>Reset Demo</button></details>
+        <div className="sidebar-bottom"><div className="profile"><span className="avatar">DE</span><div><strong>Demo {demoRole}</strong><small>Public demonstration</small></div><button className="icon-btn" aria-label="Sign out" onClick={()=>{sessionStorage.removeItem("navigator-demo-entry-v1");setEntered(false);setMobile(false);}}><LogOut size={16}/><span>Sign out</span></button></div></div>
+      </aside>
+      <div className="workspace" inert={mobile||undefined}>
+      <header className="topbar"><div className="breadcrumb"><button className="btn secondary mobile-menu" aria-label="Open navigation" aria-expanded={mobile} aria-controls="meeting-sidebar" onClick={()=>setMobile(true)}><Menu size={20}/><span>Menu</span></button><Building2 size={16}/><span>City of Bakersfield</span><ChevronRight size={14}/><strong>{{home:'Home',policies:'Policies',analyze:'Understand a Policy',tasks:'Tasks'}[view]}</strong></div><span className="role-tag">Demo {demoRole}</span></header>
+      <div className="demo-banner"><span><span className="mode-dot"/><strong>Demonstration workspace</strong><span className="banner-detail"> · Fictional examples are labeled. No live AI.</span></span><button onClick={()=>setReset(true)}>Reset Demo</button></div>
       <main id="meeting-main" className="meeting-main">
         <div className="notice">
           <strong>University demonstration · No employee login</strong>
@@ -481,6 +479,7 @@ export default function MeetingDemo() {
           certification is implied.
         </p>
       </main>
+      </div>
       {policy && (
         <Modal title="Policy Details" wide onClose={() => setSelected("")}>
           <div className="modal-body form-stack">
