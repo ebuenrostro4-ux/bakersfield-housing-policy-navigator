@@ -309,10 +309,6 @@ export default function MeetingDemo() {
         >
           <Brand />
         </Link>
-        <div className="workspace-label">
-          <span className="workspace-dot" />
-          DEMONSTRATION WORKSPACE
-        </div>
         <nav aria-label="Main navigation">
           {[
             ["/", "Home", LayoutDashboard],
@@ -335,25 +331,8 @@ export default function MeetingDemo() {
             );
           })}
         </nav>
-        <details className="sidebar-more">
-          <summary>More Tools</summary>
-          <button
-            className="btn secondary"
-            onClick={() => {
-              setReset(true);
-              setMobile(false);
-            }}
-          >
-            Reset Demo
-          </button>
-        </details>
         <div className="sidebar-bottom">
           <div className="profile">
-            <span className="avatar">DE</span>
-            <div>
-              <strong>Demo {demoRole}</strong>
-              <small>Public demonstration</small>
-            </div>
             <button
               className="icon-btn"
               aria-label="Sign out"
@@ -412,25 +391,15 @@ export default function MeetingDemo() {
         <div className="demo-banner">
           <span>
             <span className="mode-dot" />
-            <strong>Demonstration workspace</strong>
+            <strong>Student demo</strong>
             <span className="banner-detail">
               {" "}
-              · Fictional examples are labeled. No live AI.
+              · No live AI.
             </span>
           </span>
           <button onClick={() => setReset(true)}>Reset Demo</button>
         </div>
         <main id="meeting-main" className="meeting-main">
-          <div className="notice">
-            <strong>University demonstration · No employee login</strong>
-            <p>
-              Use public information only. Records save in this browser’s
-              IndexedDB, not shared City storage. Visitors in other browsers
-              have separate records. Clearing site data removes local records;
-              export a backup. This free mode does not provide shared server
-              persistence.
-            </p>
-          </div>
           {error && (
             <p role="alert" className="error-box">
               {error}
@@ -837,10 +806,11 @@ export default function MeetingDemo() {
           >
             Export Browser Records
           </button>
-          <p className="muted">
-            Student prototype. No City adoption, legal approval, or compliance
-            certification is implied.
-          </p>
+          <details className="simple-disclosure">
+            <summary>About this demo &amp; saved data</summary>
+            <p>Use public information only. Records save in this browser, not shared City storage. Other browsers have separate records. Export a backup before clearing site data.</p>
+            <p>This student prototype does not imply City adoption, legal approval, or compliance certification. Role choices are demonstration views, not employee accounts.</p>
+          </details>
         </main>
       </div>
       {policy && (
