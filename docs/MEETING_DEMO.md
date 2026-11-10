@@ -32,3 +32,11 @@ Keep the existing service on **Free**. Build using the frozen pnpm lockfile and 
 ## Remaining work
 
 Shared server-side persistence, live AI for arbitrary imports, browser-backup import, richer version differences and general notifications remain unfinished. The local/future employee account implementation is preserved but not exposed on the public meeting website. No employee login is introduced in the public release.
+
+## Planner, Reviewer and Scheduling views
+
+The welcome screen offers three demonstration perspectives. Planner focuses on sources, analyses and action plans; Reviewer shows an evidence/review queue and review-status filtering; Scheduling provides due-date ordering and upcoming, overdue, undated, blocked and completed filters. Use **Demo view** in the upper-right corner to switch without changing records. Legacy Administrator demo entry maps to Scheduling. These perspectives do not grant employee permissions or verify reviewer identities.
+
+Direct entry links: `/?role=planner`, `/?role=reviewer`, and `/?role=scheduling`. The selected role remains for the browser tab session. Each role uses the same browser IndexedDB records, task statuses and automatic progress values. No records are reset or duplicated when switching.
+
+Validated November 10: production build/TypeScript, role resolution and deadline-filter tests passed. Browser checks covered Planner entry, Reviewer analysis/revision notes and filtering, Scheduling date edits/upcoming filtering and persistence after reload, plus switching views against the same saved records.

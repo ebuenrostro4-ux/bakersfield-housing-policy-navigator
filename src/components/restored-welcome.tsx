@@ -1,7 +1,7 @@
 "use client";
-import {useState,type FormEvent} from 'react';
-import {ShieldCheck,Loader2,ArrowRight,ArrowUpRight} from 'lucide-react';
-import {Brand,Badge,Field} from './ui';
+import { useState, type FormEvent } from "react";
+import { ShieldCheck, Loader2, ArrowRight, ArrowUpRight } from "lucide-react";
+import { Brand, Badge, Field } from "./ui";
 export default function RestoredWelcome({
   demoMode,
   error,
@@ -20,10 +20,7 @@ export default function RestoredWelcome({
     setBusy(true);
     setLocalError("");
     try {
-      await onLogin(
-        account || email,
-        account ? "" : password,
-      );
+      await onLogin(account || email, account ? "" : password);
     } catch (e) {
       setLocalError((e as Error).message);
     } finally {
@@ -100,12 +97,15 @@ export default function RestoredWelcome({
           {demoMode && (
             <div className="demo-login">
               <div className="divider-label">EXPLORE THE STUDENT DEMO</div>
-              <p>Choose Planner to explore. These demo buttons open the same public practice workspace; they do not grant employee access.</p>
+              <p>
+                Choose the view that fits your work. Each view uses the same
+                saved demonstration records; these are not employee permissions.
+              </p>
               <div className="demo-role-grid">
                 {[
                   ["staff", "Planner"],
                   ["reviewer", "Reviewer"],
-                  ["admin", "Administrator"],
+                  ["scheduling", "Scheduling"],
                 ].map(([id, label]) => (
                   <button
                     className="btn secondary"
@@ -126,7 +126,8 @@ export default function RestoredWelcome({
           )}
           <p className="login-private">
             <ShieldCheck size={15} />
-            Employee sign-in is not enabled on this free demo. No public registration.
+            Employee sign-in is not enabled on this free demo. No public
+            registration.
           </p>
         </div>
       </section>
