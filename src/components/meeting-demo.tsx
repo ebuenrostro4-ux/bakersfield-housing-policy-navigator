@@ -806,7 +806,7 @@ export default function MeetingDemo() {
               setTimeout(() => URL.revokeObjectURL(url), 1000);
             }}
           >
-            Export Browser Records
+            Download Backup
           </button>
           <details className="simple-disclosure">
             <summary>About this demo &amp; saved data</summary>
