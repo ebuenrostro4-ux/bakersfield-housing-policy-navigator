@@ -9,5 +9,9 @@ for(const path of ['/api/documents','/api/archive','/api/compare','/api/policies
 const fd=new FormData();fd.append('file',new File(['Public source text to exercise extraction without storing server documents.'],'source.txt'));
 const r=await fetch(base+'/api/free-preview/extract',{method:'POST',headers:{origin:base},body:fd});assert.equal(r.status,200);assert.ok((await r.json()).document.text.includes('Public source text'));
 assert.equal((await fetch(base+'/api/free-preview/extract',{method:'POST',headers:{origin:'https://untrusted.example'},body:fd})).status,403);
-console.log('11 public-preview API isolation, extraction, and CSRF checks passed.');
+const longText='Public housing background text for extraction testing.\n'.repeat(3000)+'Final section: Staff shall publish the report by January 15, 2027.';
+const largeForm=new FormData();largeForm.append('file',new File([longText],'long-policy.txt'));
+const largeResponse=await fetch(base+'/api/free-preview/extract',{method:'POST',headers:{origin:base},body:largeForm});
+assert.equal(largeResponse.status,200);assert.equal((await largeResponse.json()).document.text,longText);
+console.log('12 public-preview API isolation, extraction, long-document and CSRF checks passed.');
 }finally{child.kill();await new Promise(resolve=>child.exitCode!==null?resolve():child.once('exit',resolve));}

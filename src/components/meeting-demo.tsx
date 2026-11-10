@@ -9,6 +9,8 @@ import {
   type DemoRole,
 } from "@/lib/demo-roles";
 import RestoredWelcome from "./restored-welcome";
+import SourceReader from "./source-reader";
+import { PUBLIC_DOCUMENT_LIMITS, PUBLIC_DOCUMENT_HELP } from "@/lib/document-limits";
 import {
   LayoutDashboard,
   Library,
@@ -827,7 +829,7 @@ export default function MeetingDemo() {
               </div>
             )}
             <h2>{policy.title}</h2>
-            <pre className="source-full">{policy.text}</pre>
+            <SourceReader key={policy.updatedAt} text={policy.text} />
             <p>{policy.notes}</p>
             <button
               className="btn primary"
@@ -841,13 +843,14 @@ export default function MeetingDemo() {
                 <p className="notice">
                   {policy.demo
                     ? "Sample analysis of a fictional scenario — no live AI used."
-                    : "Offline source excerpt only — no live AI interpretation available."}
+                    : policy.analysis.documentReview
+                      ? `Free source review · ${policy.analysis.documentReview.characters.toLocaleString()} characters scanned across ${policy.analysis.documentReview.sections} text sections.`
+                      : "Saved excerpt review. Select Analyze Policy to scan the full text."}
                 </p>
                 <p>
-                  AI-generated analysis is for informational and planning
-                  purposes. Verify important information against official
-                  sources before taking action.
+                  Verify highlighted passages against the official source before taking action.
                 </p>
+                {policy.analysis.warnings.map((warning, i) => <p key={i}>{warning}</p>)}
                 {(
                   [
                     "summary",
@@ -855,24 +858,27 @@ export default function MeetingDemo() {
                     "changes",
                     "impacts",
                     "actions",
+                    "dates",
                   ] as const
-                ).map((key) => (
+                ).filter((key) => !policy.analysis?.documentReview || ["summary", "actions", "dates"].includes(key)).map((key) => (
                   <section key={key}>
                     <h3>
                       {
                         {
-                          summary: "Simple summary",
+                          summary: policy.analysis?.documentReview ? "Key source passages" : "Simple summary",
                           plainEnglish: "In plain English",
                           changes: "What changed?",
                           impacts: "Potential impact",
-                          actions: "Recommended next steps",
+                          actions: policy.analysis?.documentReview ? "Possible requirements to review" : "Recommended next steps",
+                          dates: "Date and timing passages (unverified)",
                         }[key]
                       }
                     </h3>
                     {policy.analysis![key].length ? (
                       policy.analysis![key].map((c, i) => (
                         <div key={i}>
-                          <p>{c.text}</p>
+                          {c.sourceLabel && <strong>{c.sourceLabel}</strong>}
+                          {c.text !== c.quote && <p>{c.text}</p>}
                           <blockquote>{c.quote}</blockquote>
                         </div>
                       ))
@@ -909,7 +915,7 @@ export default function MeetingDemo() {
                   <h4>
                     Version {v.number} · {formatDate(v.at)}
                   </h4>
-                  <pre className="source-full">{v.text}</pre>
+                  <SourceReader text={v.text} label={`Version ${v.number} source`} />
                 </section>
               ))}
               <p>
@@ -961,6 +967,7 @@ export default function MeetingDemo() {
               source: form.source,
               reportedDate: form.date,
               notes: form.notes,
+              importWarnings: form.importWarnings,
               demo: false,
               analysis: null,
               archived: false,
@@ -1259,6 +1266,7 @@ function PublicImport({
     date: string;
     notes: string;
     target: string;
+    importWarnings: string[];
   }) => Promise<void>;
 }) {
   const [f, setF] = useState({
@@ -1268,6 +1276,7 @@ function PublicImport({
       date: "",
       notes: "",
       target: "",
+      importWarnings: [] as string[],
     }),
     [file, setFile] = useState<File | null>(null),
     [busy, setBusy] = useState(false),
@@ -1284,7 +1293,10 @@ function PublicImport({
           e.preventDefault();
           const date = String(new FormData(e.currentTarget).get("date") || "");
           setBusy(true);
+          setError("");
           try {
+            if (f.text.length > PUBLIC_DOCUMENT_LIMITS.characters)
+              throw new Error("This policy exceeds 5 million characters. Import it in separate parts; no text will be cut off.");
             if (f.source && !/^https?:\/\//i.test(f.source))
               throw new Error("Use an http or https source URL.");
             await onSave({ ...f, date });
@@ -1302,11 +1314,11 @@ function PublicImport({
         </p>
         {mode === "import" && (
           <>
-            <Field label="PDF, Word or text document (maximum 5 MB)">
+            <Field label={PUBLIC_DOCUMENT_HELP}>
               <input
                 type="file"
                 accept=".pdf,.docx,.txt"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                onChange={(e) => { setFile(e.target.files?.[0] || null); setF({ ...f, text: "", importWarnings: [] }); setError(""); }}
               />
             </Field>
             <button
@@ -1316,7 +1328,10 @@ function PublicImport({
               onClick={async () => {
                 if (!file) return;
                 setBusy(true);
+                setError("");
                 try {
+                  if (file.size > PUBLIC_DOCUMENT_LIMITS.fileBytes)
+                    throw new Error("The maximum upload size is 20 MB. Compress the file or import it in separate parts.");
                   const fd = new FormData();
                   fd.append("file", file);
                   const r = await employeeRequest(
@@ -1327,6 +1342,7 @@ function PublicImport({
                     ...f,
                     text: r.document.text,
                     title: f.title || file.name.replace(/\.[^.]+$/, ""),
+                    importWarnings: r.document.warnings || [],
                   });
                 } catch (e) {
                   setError((e as Error).message);
@@ -1375,11 +1391,12 @@ function PublicImport({
             rows={10}
             required
             minLength={40}
-            maxLength={60000}
             value={f.text}
             onChange={(e) => setF({ ...f, text: e.target.value })}
           />
         </Field>
+        <p role="status">{f.text.length.toLocaleString()} characters · full text will be saved and scanned in sections</p>
+        {f.importWarnings.map((warning, i) => <p key={i} className="notice">{warning}</p>)}
         <Field label="Notes or bill number">
           <textarea
             value={f.notes}
@@ -1393,7 +1410,7 @@ function PublicImport({
           </p>
         )}
         <button className="btn primary" disabled={busy || f.text.length < 40}>
-          Save Policy
+          {busy ? "Working…" : "Save Policy"}
         </button>
       </form>
     </Modal>
@@ -1420,7 +1437,7 @@ function ActionPlan({
       policy.analysis!.actions.map((a, index) => ({
         index,
         title: a.text.split(" Reason:")[0],
-        assignee: "Example housing team",
+        assignee: policy.demo ? "Example housing team" : "",
         priority: "Normal",
         dueDate: "",
       })),

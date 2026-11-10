@@ -77,6 +77,8 @@ test("uploaded text receives no invented actions or legal interpretation in offl
   };
   const a = meetingAnalysis(p);
   assert.equal(a.actions.length, 0);
-  assert.equal(a.dates.length, 0);
-  assert.ok(a.warnings[0].includes("unavailable"));
+  // Keyword review may flag the word "deadline", but never invents one.
+  for (const passage of a.dates) assert.equal(passage.text, passage.quote);
+  for (const passage of [...a.summary, ...a.dates]) assert.ok(p.text.includes(passage.quote));
+  assert.ok(a.warnings[0].includes("keyword"));
 });

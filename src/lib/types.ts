@@ -17,6 +17,12 @@ export type Claim = {
 };
 export type AnalysisResult = {
   mode: "demo" | "live" | "prepared";
+  documentReview?: {
+    characters: number;
+    sections: number;
+    actionPassages: number;
+    datePassages: number;
+  };
   summary: Claim[];
   changes: Claim[];
   plainEnglish: Claim[];
