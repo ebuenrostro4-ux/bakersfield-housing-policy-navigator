@@ -791,26 +791,9 @@ export default function MeetingDemo() {
               ))}
             </>
           )}
-          <button
-            className="btn secondary"
-            onClick={() => {
-              const a = document.createElement("a"),
-                url = URL.createObjectURL(
-                  new Blob([JSON.stringify(state, null, 2)], {
-                    type: "application/json",
-                  }),
-                );
-              a.href = url;
-              a.download = "housing-navigator-browser-backup.json";
-              a.click();
-              setTimeout(() => URL.revokeObjectURL(url), 1000);
-            }}
-          >
-            Download Backup
-          </button>
           <details className="simple-disclosure">
             <summary>About this demo &amp; saved data</summary>
-            <p>Use public information only. Records save in this browser, not shared City storage. Other browsers have separate records. Export a backup before clearing site data.</p>
+            <p>Use public information only. Records save in this browser, not shared City storage. Other browsers have separate records. Clearing site data removes saved records.</p>
             <p>This student prototype does not imply City adoption, legal approval, or compliance certification. Role choices are demonstration views, not employee accounts.</p>
           </details>
         </main>
