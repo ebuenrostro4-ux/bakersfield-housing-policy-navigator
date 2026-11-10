@@ -5,12 +5,25 @@ import { ApiError } from "./api";
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 export const MAX_DOCUMENT_CHARS = 60_000;
-const MAX_REQUEST_BYTES = MAX_FILE_BYTES + 64 * 1024;
+type DocumentLimits = {
+  fileBytes: number;
+  characters: number;
+  pages: number;
+  allowPartialText?: boolean;
+};
+const employeeLimits: DocumentLimits = {
+  fileBytes: MAX_FILE_BYTES,
+  characters: MAX_DOCUMENT_CHARS,
+  pages: 100,
+};
 
 /** Bound the actual stream, including requests that omit or misreport Content-Length. */
 export async function readUpload(
   request: Request,
-): Promise<{ name: string; kind: string; text: string }> {
+  limits: DocumentLimits = employeeLimits,
+): Promise<{ name: string; kind: string; text: string; warnings: string[] }> {
+  const maxRequestBytes = limits.fileBytes + 64 * 1024;
+  const sizeError = `The maximum upload size is ${limits.fileBytes / 1024 / 1024} MB. Compress the file or upload it in separate parts.`;
   const type = request.headers.get("content-type") ?? "";
   if (!type.toLowerCase().startsWith("multipart/form-data;")) {
     throw new ApiError(
@@ -19,8 +32,7 @@ export async function readUpload(
     );
   }
   const length = Number(request.headers.get("content-length") ?? 0);
-  if (length > MAX_REQUEST_BYTES)
-    throw new ApiError(413, "The maximum upload size is 5 MB.");
+  if (length > maxRequestBytes) throw new ApiError(413, sizeError);
   if (!request.body)
     throw new ApiError(400, "Choose a PDF, DOCX, or text file.");
   const reader = request.body.getReader();
@@ -31,9 +43,9 @@ export async function readUpload(
       const { value, done } = await reader.read();
       if (done) break;
       total += value.byteLength;
-      if (total > MAX_REQUEST_BYTES) {
+      if (total > maxRequestBytes) {
         await reader.cancel();
-        throw new ApiError(413, "The maximum upload size is 5 MB.");
+        throw new ApiError(413, sizeError);
       }
       chunks.push(value);
     }
@@ -65,8 +77,7 @@ export async function readUpload(
     throw new ApiError(400, "Choose exactly one PDF, DOCX, or text file.");
   }
   if (file.size === 0) throw new ApiError(400, "The selected file is empty.");
-  if (file.size > MAX_FILE_BYTES)
-    throw new ApiError(413, "The maximum upload size is 5 MB.");
+  if (file.size > limits.fileBytes) throw new ApiError(413, sizeError);
   const kind = data.get("kind") ?? "policy";
   if (
     typeof kind !== "string" ||
@@ -78,16 +89,21 @@ export async function readUpload(
     );
   }
   const name = file.name.replace(/[\\/\u0000-\u001f]/g, "_").slice(0, 160);
+  const warnings: string[] = [];
   const text = await extractDocument(
     name,
     new Uint8Array(await file.arrayBuffer()),
+    limits,
+    warnings,
   );
-  return { name, kind, text };
+  return { name, kind, text, warnings };
 }
 
 export async function extractDocument(
   name: string,
   bytes: Uint8Array,
+  limits: DocumentLimits = employeeLimits,
+  warnings: string[] = [],
 ): Promise<string> {
   let text: string;
   if (name.toLowerCase().endsWith(".pdf")) {
@@ -104,18 +120,33 @@ export async function extractDocument(
     });
     try {
       const info = await parser.getInfo();
-      if (info.total > 100)
+      if (info.total > limits.pages)
         throw new ApiError(
           413,
-          "PDFs are limited to 100 pages. Upload the relevant section.",
+          `PDFs are limited to ${limits.pages.toLocaleString()} pages. Split this document into parts and import each part.`,
         );
-      const result = await parser.getText();
-      if (result.pages.some((page) => page.text.trim().length < 20))
+      const parts: string[] = [], unreadable: number[] = [];
+      let characters = 0;
+      // Read every page in small batches; do not send a huge document to an AI
+      // context window or silently keep only its beginning.
+      for (let first = 1; first <= info.total; first += 25) {
+        const result = await parser.getText({ first, last: Math.min(first + 24, info.total) });
+        for (const page of result.pages) {
+          if (page.text.trim().length < 20) unreadable.push(page.num);
+          characters += page.text.length + 2;
+          if (characters > limits.characters + 2)
+            throw new ApiError(413, `Extracted text exceeds ${limits.characters.toLocaleString()} characters. Split the document into parts; no text was saved or cut off.`);
+          parts.push(page.text);
+        }
+      }
+      if (unreadable.length && !limits.allowPartialText)
         throw new ApiError(
           422,
           "One or more PDF pages have too little readable text. The document may include scanned pages. Run OCR or upload a complete text-only section, then review the preview.",
         );
-      text = result.pages.map((page) => page.text).join("\n\n");
+      if (unreadable.length)
+        warnings.push(`${unreadable.length} PDF page(s) contain little or no readable text (pages ${unreadable.slice(0, 20).join(", ")}${unreadable.length > 20 ? ", …" : ""}). Blank, image or scanned content may be missing. Run OCR and reimport to include it; review results cover extracted text only.`);
+      text = parts.join("\n\n");
     } catch (error) {
       if (error instanceof ApiError) throw error;
       throw new ApiError(
@@ -214,10 +245,10 @@ export async function extractDocument(
       422,
       "No usable text was found. Scanned PDFs need OCR first, or paste the policy text.",
     );
-  if (text.length > MAX_DOCUMENT_CHARS)
+  if (text.length > limits.characters)
     throw new ApiError(
       413,
-      "Documents are limited to 60,000 characters. Upload a relevant section.",
+      `Extracted text exceeds ${limits.characters.toLocaleString()} characters. Split the document into parts; no text was saved or cut off.`,
     );
   return text;
 }

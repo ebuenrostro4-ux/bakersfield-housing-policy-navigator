@@ -1671,6 +1671,14 @@ blockquote {
 .source-header + .muted {
   font-size: 16px;
 }
+.source-reader-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.source-reader-controls input { flex: 1; min-width: 180px; }
+.source-reader-controls label { display: flex; align-items: center; gap: 8px; }
 .source-full {
   font-family: inherit;
   font-size: 16px;

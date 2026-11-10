@@ -1,4 +1,5 @@
 import type { AnalysisResult, Task } from "./types";
+import { reviewDocument } from "./document-review";
 export type DemoPolicy = {
   id: string;
   title: string;
@@ -6,6 +7,7 @@ export type DemoPolicy = {
   source: string;
   reportedDate: string;
   notes: string;
+  importWarnings?: string[];
   demo: boolean;
   analysis: AnalysisResult | null;
   archived: boolean;
@@ -130,6 +132,11 @@ export function meetingAnalysis(p: DemoPolicy): AnalysisResult {
   const definition = definitions.find(
     (d) => d.id === p.id && d.text === p.text,
   );
+  if (!definition) {
+    const analysis = reviewDocument(p.id, p.text);
+    analysis.warnings.push(...(p.importWarnings || []));
+    return analysis;
+  }
   const quote = (text: string, evidence: string) => ({
     text,
     quote: evidence,

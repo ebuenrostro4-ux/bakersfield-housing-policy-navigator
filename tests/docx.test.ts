@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { extractDocument } from "../src/lib/documents";
+import { PUBLIC_DOCUMENT_LIMITS } from "../src/lib/document-limits";
 function zip(files: Record<string, string>) {
   const chunks: Buffer[] = [],
     directory: Buffer[] = [];
@@ -45,13 +46,13 @@ function zip(files: Record<string, string>) {
   return Buffer.concat([...chunks, central, end]);
 }
 test("DOCX raw text extracts without rendering HTML and rejects malformed archives", async () => {
-  const text = "Public policy text supplied only to test document extraction.";
+  const text = "Public policy text supplied only to test document extraction. ".repeat(2_000).trim();
   const bytes = zip({
     "[Content_Types].xml":
       '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
     "word/document.xml": `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>${text}</w:t></w:r></w:p></w:body></w:document>`,
   });
-  assert.equal(await extractDocument("policy.docx", bytes), text);
+  assert.equal(await extractDocument("policy.docx", bytes, PUBLIC_DOCUMENT_LIMITS), text);
   await assert.rejects(extractDocument("bad.docx", Buffer.from("invalid zip")));
   const bad = Buffer.from(bytes);
   const at = bad.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
