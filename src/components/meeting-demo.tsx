@@ -1,8 +1,25 @@
 "use client";
 import { useEffect, useState, FormEvent } from "react";
 import Link from "next/link";
+import {
+  demoRole as parseDemoRole,
+  roleDetails,
+  scheduleTasks,
+  DEMO_ROLES,
+  type DemoRole,
+} from "@/lib/demo-roles";
 import RestoredWelcome from "./restored-welcome";
-import {LayoutDashboard,Library,Sparkles,ListChecks,LogOut,Menu,X,Building2,ChevronRight} from "lucide-react";
+import {
+  LayoutDashboard,
+  Library,
+  Sparkles,
+  ListChecks,
+  LogOut,
+  Menu,
+  X,
+  Building2,
+  ChevronRight,
+} from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Brand, Modal, Field, OfficialLink, formatDate } from "./ui";
 import { TaskProgress, employeeRequest } from "./employee";
@@ -65,9 +82,47 @@ export default function MeetingDemo() {
           : path === "/analyzer"
             ? "analyze"
             : "home";
-  const [entered,setEntered]=useState(false),[entryReady,setEntryReady]=useState(false),[demoRole,setDemoRole]=useState("Planner"),[mobile,setMobile]=useState(false);
-  useEffect(()=>{const role=sessionStorage.getItem("navigator-demo-entry-v1");if(role){setDemoRole(role);setEntered(true);}setEntryReady(true);},[]);
-  useEffect(()=>{const close=(e:KeyboardEvent)=>{if(e.key==="Escape")setMobile(false);};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close);},[]);
+  const [entered, setEntered] = useState(false),
+    [entryReady, setEntryReady] = useState(false),
+    [demoRole, setDemoRole] = useState<DemoRole>("Planner"),
+    [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const role =
+      parseDemoRole(params.get("role")) ||
+      parseDemoRole(sessionStorage.getItem("navigator-demo-entry-v1"));
+    if (params.has("role")) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("role");
+      window.history.replaceState(
+        window.history.state,
+        "",
+        url.pathname + url.search + url.hash,
+      );
+    }
+    if (role) {
+      sessionStorage.setItem("navigator-demo-entry-v1", role);
+      setDemoRole(role);
+      setEntered(true);
+    }
+    setEntryReady(true);
+  }, []);
+  const [reviewFilter, setReviewFilter] = useState("all"),
+    [scheduleFilter, setScheduleFilter] = useState("all");
+  const roleInfo = roleDetails[demoRole];
+  function switchRole(role: DemoRole) {
+    sessionStorage.setItem("navigator-demo-entry-v1", role);
+    setDemoRole(role);
+    setReviewFilter("all");
+    setScheduleFilter("all");
+  }
+  useEffect(() => {
+    const close = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobile(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, []);
   const [state, setState] = useState<MeetingState | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -112,8 +167,30 @@ export default function MeetingDemo() {
       setBusy(false);
     }
   }
-  if(entryReady&&!entered)return <RestoredWelcome demoMode error="" onLogin={async(email)=>{const roles:Record<string,string>={"staff@bakersfield.demo":"Planner","reviewer@bakersfield.demo":"Reviewer","admin@bakersfield.demo":"Administrator"};const role=roles[email];if(!role)throw new Error("Employee sign-in is not enabled here. Choose a demo button below to explore.");sessionStorage.setItem("navigator-demo-entry-v1",role);setDemoRole(role);setEntered(true);}}/>;
-  if (!state||!entryReady)
+  if (entryReady && !entered)
+    return (
+      <RestoredWelcome
+        demoMode
+        error=""
+        onLogin={async (email) => {
+          const roles: Record<string, DemoRole> = {
+            "staff@bakersfield.demo": "Planner",
+            "reviewer@bakersfield.demo": "Reviewer",
+            "admin@bakersfield.demo": "Scheduling",
+            "scheduling@bakersfield.demo": "Scheduling",
+          };
+          const role = roles[email];
+          if (!role)
+            throw new Error(
+              "Employee sign-in is not enabled here. Choose a demo button below to explore.",
+            );
+          sessionStorage.setItem("navigator-demo-entry-v1", role);
+          setDemoRole(role);
+          setEntered(true);
+        }}
+      />
+    );
+  if (!state || !entryReady)
     return (
       <main className="research-panel">
         <Brand />
@@ -123,6 +200,9 @@ export default function MeetingDemo() {
   const policy = state.policies.find((p) => p.id === selected),
     active = state.policies.filter((p) => !p.archived),
     demoIds = new Set(state.policies.filter((p) => p.demo).map((p) => p.id));
+  const visibleTasks = state.tasks.filter(
+    (t) => !t.policyId || active.some((p) => p.id === t.policyId),
+  );
   const log = (text: string) => [text, ...state.activity].slice(0, 40);
   async function updatePolicy(p: DemoPolicy) {
     await save(
@@ -159,6 +239,13 @@ export default function MeetingDemo() {
           {t.dueDate ? `Due ${formatDate(t.dueDate, true)}` : "No due date"} ·{" "}
           {t.priority}
         </p>
+        {t.policyId && (
+          <p>
+            Related policy:{" "}
+            {state!.policies.find((p) => p.id === t.policyId)?.title ||
+              "Archived policy"}
+          </p>
+        )}
         <TaskProgress task={t} />
         <Field label={`Status for ${t.title}`}>
           <select
@@ -197,288 +284,564 @@ export default function MeetingDemo() {
   }
   return (
     <div className="app-shell meeting-shell restored-meeting">
-      <a className="skip-link" href="#meeting-main">Skip to content</a>
-      {mobile&&<button className="nav-scrim" aria-label="Close navigation" onClick={()=>setMobile(false)}/>}
-      <aside id="meeting-sidebar" className={`sidebar ${mobile?'open':''}`}>
-        <button className="btn secondary sidebar-close" onClick={()=>setMobile(false)}><X size={20}/>Close Menu</button>
-        <Link href="/" className="brand-link" aria-label="Housing Policy Navigator home"><Brand/></Link>
-        <div className="workspace-label"><span className="workspace-dot"/>DEMONSTRATION WORKSPACE</div>
-        <nav aria-label="Main navigation">{[['/','Home',LayoutDashboard],['/library','Policies',Library],['/analyzer','Analyze a Policy',Sparkles],['/tracker','Tasks',ListChecks]].map(([url,label,Icon])=>{const Glyph=Icon as typeof LayoutDashboard;return <Link key={url as string} href={url as string} className={`nav-item ${path===url?'active':''}`} aria-current={path===url?'page':undefined} onClick={()=>setMobile(false)}><Glyph size={19}/><span>{label as string}</span></Link>;})}</nav>
-        <details className="sidebar-more"><summary>More Tools</summary><button className="btn secondary" onClick={()=>{setReset(true);setMobile(false);}}>Reset Demo</button></details>
-        <div className="sidebar-bottom"><div className="profile"><span className="avatar">DE</span><div><strong>Demo {demoRole}</strong><small>Public demonstration</small></div><button className="icon-btn" aria-label="Sign out" onClick={()=>{sessionStorage.removeItem("navigator-demo-entry-v1");setEntered(false);setMobile(false);}}><LogOut size={16}/><span>Sign out</span></button></div></div>
-      </aside>
-      <div className="workspace" inert={mobile||undefined}>
-      <header className="topbar"><div className="breadcrumb"><button className="btn secondary mobile-menu" aria-label="Open navigation" aria-expanded={mobile} aria-controls="meeting-sidebar" onClick={()=>setMobile(true)}><Menu size={20}/><span>Menu</span></button><Building2 size={16}/><span>City of Bakersfield</span><ChevronRight size={14}/><strong>{{home:'Home',policies:'Policies',analyze:'Understand a Policy',tasks:'Tasks'}[view]}</strong></div><span className="role-tag">Demo {demoRole}</span></header>
-      <div className="demo-banner"><span><span className="mode-dot"/><strong>Demonstration workspace</strong><span className="banner-detail"> · Fictional examples are labeled. No live AI.</span></span><button onClick={()=>setReset(true)}>Reset Demo</button></div>
-      <main id="meeting-main" className="meeting-main">
-        <div className="notice">
-          <strong>University demonstration · No employee login</strong>
-          <p>
-            Use public information only. Records save in this browser’s
-            IndexedDB, not shared City storage. Visitors in other browsers have
-            separate records. Clearing site data removes local records; export a
-            backup. This free mode does not provide shared server persistence.
-          </p>
+      <a className="skip-link" href="#meeting-main">
+        Skip to content
+      </a>
+      {mobile && (
+        <button
+          className="nav-scrim"
+          aria-label="Close navigation"
+          onClick={() => setMobile(false)}
+        />
+      )}
+      <aside id="meeting-sidebar" className={`sidebar ${mobile ? "open" : ""}`}>
+        <button
+          className="btn secondary sidebar-close"
+          onClick={() => setMobile(false)}
+        >
+          <X size={20} />
+          Close Menu
+        </button>
+        <Link
+          href="/"
+          className="brand-link"
+          aria-label="Housing Policy Navigator home"
+        >
+          <Brand />
+        </Link>
+        <div className="workspace-label">
+          <span className="workspace-dot" />
+          DEMONSTRATION WORKSPACE
         </div>
-        {error && (
-          <p role="alert" className="error-box">
-            {error}
-          </p>
-        )}
-        {notice && <p role="status">{notice}</p>}
-        {view === "home" && (
-          <>
-            <h1>From housing policy to action</h1>
+        <nav aria-label="Main navigation">
+          {[
+            ["/", "Home", LayoutDashboard],
+            ["/library", roleInfo.policies, Library],
+            ["/analyzer", roleInfo.analyzer, Sparkles],
+            ["/tracker", roleInfo.tasks, ListChecks],
+          ].map(([url, label, Icon]) => {
+            const Glyph = Icon as typeof LayoutDashboard;
+            return (
+              <Link
+                key={url as string}
+                href={url as string}
+                className={`nav-item ${path === url ? "active" : ""}`}
+                aria-current={path === url ? "page" : undefined}
+                onClick={() => setMobile(false)}
+              >
+                <Glyph size={19} />
+                <span>{label as string}</span>
+              </Link>
+            );
+          })}
+        </nav>
+        <details className="sidebar-more">
+          <summary>More Tools</summary>
+          <button
+            className="btn secondary"
+            onClick={() => {
+              setReset(true);
+              setMobile(false);
+            }}
+          >
+            Reset Demo
+          </button>
+        </details>
+        <div className="sidebar-bottom">
+          <div className="profile">
+            <span className="avatar">DE</span>
+            <div>
+              <strong>Demo {demoRole}</strong>
+              <small>Public demonstration</small>
+            </div>
+            <button
+              className="icon-btn"
+              aria-label="Sign out"
+              onClick={() => {
+                sessionStorage.removeItem("navigator-demo-entry-v1");
+                setEntered(false);
+                setMobile(false);
+              }}
+            >
+              <LogOut size={16} />
+              <span>Sign out</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+      <div className="workspace" inert={mobile || undefined}>
+        <header className="topbar">
+          <div className="breadcrumb">
+            <button
+              className="btn secondary mobile-menu"
+              aria-label="Open navigation"
+              aria-expanded={mobile}
+              aria-controls="meeting-sidebar"
+              onClick={() => setMobile(true)}
+            >
+              <Menu size={20} />
+              <span>Menu</span>
+            </button>
+            <Building2 size={16} />
+            <span>City of Bakersfield</span>
+            <ChevronRight size={14} />
+            <strong>
+              {
+                {
+                  home: "Home",
+                  policies: roleInfo.policies,
+                  analyze: roleInfo.analyzer,
+                  tasks: roleInfo.tasks,
+                }[view]
+              }
+            </strong>
+          </div>
+          <label className="role-switch">
+            Demo view{" "}
+            <select
+              aria-label="Switch demo view"
+              value={demoRole}
+              onChange={(e) => switchRole(e.target.value as DemoRole)}
+            >
+              {DEMO_ROLES.map((r) => (
+                <option key={r}>{r}</option>
+              ))}
+            </select>
+          </label>
+        </header>
+        <div className="demo-banner">
+          <span>
+            <span className="mode-dot" />
+            <strong>Demonstration workspace</strong>
+            <span className="banner-detail">
+              {" "}
+              · Fictional examples are labeled. No live AI.
+            </span>
+          </span>
+          <button onClick={() => setReset(true)}>Reset Demo</button>
+        </div>
+        <main id="meeting-main" className="meeting-main">
+          <div className="notice">
+            <strong>University demonstration · No employee login</strong>
             <p>
-              Try either fictional policy, review the sample analysis, create an
-              action plan, and change task statuses. The progress bar follows
-              automatically.
+              Use public information only. Records save in this browser’s
+              IndexedDB, not shared City storage. Visitors in other browsers
+              have separate records. Clearing site data removes local records;
+              export a backup. This free mode does not provide shared server
+              persistence.
             </p>
-            <div className="detail-tools">
+          </div>
+          {error && (
+            <p role="alert" className="error-box">
+              {error}
+            </p>
+          )}
+          {notice && <p role="status">{notice}</p>}
+          {view === "home" && demoRole === "Planner" && (
+            <>
+              <h1>{roleInfo.title}</h1>
+              <p>
+                Try either fictional policy, review the sample analysis, create
+                an action plan, and change task statuses. The progress bar
+                follows automatically.
+              </p>
+              <div className="detail-tools">
+                <button
+                  className="btn primary"
+                  onClick={() => setImporting("import")}
+                >
+                  Import Policy
+                </button>
+                <button
+                  className="btn secondary"
+                  onClick={() => setImporting("paste")}
+                >
+                  Paste Policy
+                </button>
+                <button
+                  className="btn secondary"
+                  onClick={() => setTask(blankTask(""))}
+                >
+                  Create Task
+                </button>
+              </div>
+              <h2>Two demonstration policies</h2>
+              {active
+                .filter((p) => p.demo)
+                .map((p) => (
+                  <article className="simple-policy" key={p.id}>
+                    <div>
+                      <strong>{DEMO_LABEL}</strong>
+                      <h3>{p.title}</h3>
+                      <p>
+                        Fictional administrative scenario for demonstrating the
+                        workflow.
+                      </p>
+                    </div>
+                    <button
+                      className="btn primary"
+                      onClick={() => setSelected(p.id)}
+                    >
+                      Open Demo Policy
+                    </button>
+                  </article>
+                ))}
+              <h2>Demonstration tasks</h2>
+              <div className="employee-task-grid">
+                {state.tasks
+                  .filter((t) => t.policyId && demoIds.has(t.policyId))
+                  .map(card)}
+              </div>
+              <h2>Other responsibilities</h2>
+              <div className="employee-task-grid">
+                {state.tasks
+                  .filter((t) => !t.policyId || !demoIds.has(t.policyId))
+                  .map(card)}
+              </div>
+              <h2>Policies requiring attention</h2>
+              {active
+                .filter((p) => !p.demo && p.review !== "Reviewed")
+                .map((p) => (
+                  <p key={p.id}>
+                    <button
+                      className="text-link"
+                      onClick={() => setSelected(p.id)}
+                    >
+                      {p.title} · {p.review}
+                    </button>
+                  </p>
+                ))}
+              <h2>Recent activity</h2>
+              {state.activity.length ? (
+                state.activity.slice(0, 5).map((a, i) => <p key={i}>{a}</p>)
+              ) : (
+                <p>No changes yet.</p>
+              )}
+            </>
+          )}
+          {view === "home" && demoRole === "Reviewer" && (
+            <>
+              <h1>{roleInfo.title}</h1>
+              <p>{roleInfo.description}</p>
+              <h2>Review queue</h2>
+              <p>
+                {
+                  active.filter((p) => p.analysis && p.review !== "Reviewed")
+                    .length
+                }{" "}
+                analyses awaiting review ·{" "}
+                {active.filter((p) => !p.analysis).length} policies need
+                analysis ·{" "}
+                {active.filter((p) => p.review === "Needs Revision").length}{" "}
+                need revision
+              </p>
+              {active
+                .filter((p) => p.review !== "Reviewed")
+                .map((p) => (
+                  <article className="simple-policy" key={p.id}>
+                    <div>
+                      {p.demo && <strong>{DEMO_LABEL}</strong>}
+                      <h3>{p.title}</h3>
+                      <p>
+                        {p.review}
+                        {p.reviewer ? ` · Entered reviewer: ${p.reviewer}` : ""}
+                      </p>
+                    </div>
+                    <button
+                      className="btn primary"
+                      onClick={() => setSelected(p.id)}
+                    >
+                      {p.analysis
+                        ? "Review Evidence and Analysis"
+                        : "Open Source for Review"}
+                    </button>
+                  </article>
+                ))}
+              {!active.some((p) => p.review !== "Reviewed") && (
+                <p>No policies awaiting review.</p>
+              )}
+              <p>
+                Open a policy to read its source and supporting passages, record
+                your name and review notes, and select Reviewed or Needs
+                Revision. Names are demonstration labels, not authenticated
+                approvals.
+              </p>
+            </>
+          )}
+          {view === "home" && demoRole === "Scheduling" && (
+            <>
+              <h1>{roleInfo.title}</h1>
+              <p>{roleInfo.description}</p>
               <button
                 className="btn primary"
-                onClick={() => setImporting("import")}
+                onClick={() => setTask(blankTask(""))}
               >
-                Import Policy
+                Create Scheduled Task
               </button>
+              <h2>Deadline overview</h2>
+              <p>
+                Includes the labeled demonstration tasks and your saved
+                responsibilities.
+              </p>
+              <p>
+                {
+                  scheduleTasks(
+                    visibleTasks,
+                    "overdue",
+                    new Date().toLocaleDateString("en-CA", {
+                      timeZone: "America/Los_Angeles",
+                    }),
+                  ).length
+                }{" "}
+                overdue ·{" "}
+                {
+                  scheduleTasks(
+                    visibleTasks,
+                    "upcoming",
+                    new Date().toLocaleDateString("en-CA", {
+                      timeZone: "America/Los_Angeles",
+                    }),
+                  ).length
+                }{" "}
+                upcoming ·{" "}
+                {visibleTasks.filter((t) => t.status === "Blocked").length}{" "}
+                blocked · {scheduleTasks(visibleTasks, "undated", "").length}{" "}
+                without a date
+              </p>
+              <p>
+                Open a task to enter its responsible person and staff target
+                date. Tasks with dates appear first. No legal deadlines are
+                inferred.
+              </p>
+              <div className="employee-task-grid">
+                {scheduleTasks(visibleTasks, "all", "").slice(0, 8).map(card)}
+              </div>
+            </>
+          )}
+          {(view === "policies" || view === "analyze") && (
+            <>
+              <h1>
+                {view === "policies" ? roleInfo.policies : roleInfo.analyzer}
+              </h1>
+              <p>{roleInfo.description}</p>
+              <p>
+                Choose one of the two fictional examples, or add a public-source
+                document. Sample analyses are prepared examples, not live AI.
+              </p>
+              <div className="detail-tools">
+                <button
+                  className="btn primary"
+                  onClick={() => setImporting("import")}
+                >
+                  Import Policy
+                </button>
+                <button
+                  className="btn secondary"
+                  onClick={() => setImporting("paste")}
+                >
+                  Copy &amp; Paste Policy
+                </button>
+                <button
+                  className="btn secondary"
+                  onClick={() => setArchive(!archive)}
+                >
+                  {archive ? "Show Active Policies" : "View Archived Policies"}
+                </button>
+              </div>
+              <Field label="Search policy name or source">
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </Field>
+              {demoRole === "Reviewer" && (
+                <Field label="Filter review status">
+                  <select
+                    value={reviewFilter}
+                    onChange={(e) => setReviewFilter(e.target.value)}
+                  >
+                    <option value="all">All review statuses</option>
+                    {[
+                      "Pending Analysis",
+                      "Pending Review",
+                      "Reviewed",
+                      "Needs Revision",
+                    ].map((r) => (
+                      <option key={r}>{r}</option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+              {[true, false].map((demo) => (
+                <section key={String(demo)}>
+                  <h2>
+                    {demo
+                      ? "Fictional demonstration policies"
+                      : "Uploaded public policies"}
+                  </h2>
+                  {state.policies
+                    .filter(
+                      (p) =>
+                        p.demo === demo &&
+                        p.archived === archive &&
+                        (reviewFilter === "all" || p.review === reviewFilter) &&
+                        `${p.title} ${p.source}`
+                          .toLowerCase()
+                          .includes(search.toLowerCase()),
+                    )
+                    .map((p) => (
+                      <article className="simple-policy" key={p.id}>
+                        <div>
+                          {p.demo && <strong>{DEMO_LABEL}</strong>}
+                          <h3>{p.title}</h3>
+                          <p>
+                            {p.review} · Version {p.versions.length} · Added{" "}
+                            {formatDate(p.createdAt)}
+                          </p>
+                          <p>
+                            Reported effective date:{" "}
+                            {p.reportedDate
+                              ? `${p.reportedDate} (unverified)`
+                              : "Not verified"}
+                          </p>
+                          {p.source && (
+                            <OfficialLink url={p.source}>
+                              Original source
+                            </OfficialLink>
+                          )}
+                        </div>
+                        <div className="detail-tools">
+                          <button
+                            className="btn secondary"
+                            onClick={() => setSelected(p.id)}
+                          >
+                            View Policy
+                          </button>
+                          {!p.archived && (
+                            <button
+                              className="btn primary"
+                              disabled={busy}
+                              onClick={() => analyze(p)}
+                            >
+                              Analyze Policy
+                            </button>
+                          )}
+                          {p.archived && (
+                            <button
+                              className="btn secondary"
+                              onClick={() =>
+                                updatePolicy({ ...p, archived: false })
+                              }
+                            >
+                              Restore Policy
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                  {!demo && !state.policies.some((p) => !p.demo) && (
+                    <p>
+                      No public policies have been added yet. Import a policy or
+                      paste policy text to get started.
+                    </p>
+                  )}
+                </section>
+              ))}
+            </>
+          )}
+          {view === "tasks" && (
+            <>
+              <h1>{roleInfo.tasks}</h1>
+              <p>
+                {demoRole === "Scheduling"
+                  ? roleInfo.description
+                  : demoRole === "Reviewer"
+                    ? "Inspect responsibilities related to the policies you review. Open the related policy for source and review notes."
+                    : "Track actions from policy plans and general planning responsibilities."}
+              </p>
+              <p>
+                Change a status to update its progress. Percentages represent
+                status, not an independent estimate of work.
+              </p>
               <button
-                className="btn secondary"
-                onClick={() => setImporting("paste")}
-              >
-                Paste Policy
-              </button>
-              <Link className="btn secondary" href="/analyzer">
-                Analyze Policy
-              </Link>
-              <button
-                className="btn secondary"
+                className="btn primary"
                 onClick={() => setTask(blankTask(""))}
               >
                 Create Task
               </button>
-              <Link className="btn secondary" href="/tracker">
-                View Tasks
-              </Link>
-            </div>
-            <h2>Two demonstration policies</h2>
-            {active
-              .filter((p) => p.demo)
-              .map((p) => (
-                <article className="simple-policy" key={p.id}>
-                  <div>
-                    <strong>{DEMO_LABEL}</strong>
-                    <h3>{p.title}</h3>
-                    <p>
-                      Fictional administrative scenario for demonstrating the
-                      workflow.
-                    </p>
-                  </div>
-                  <button
-                    className="btn primary"
-                    onClick={() => setSelected(p.id)}
+              {demoRole === "Scheduling" && (
+                <Field label="Schedule filter">
+                  <select
+                    value={scheduleFilter}
+                    onChange={(e) => setScheduleFilter(e.target.value)}
                   >
-                    Open Demo Policy
-                  </button>
-                </article>
-              ))}
-            <h2>Demonstration tasks</h2>
-            <div className="employee-task-grid">
-              {state.tasks
-                .filter((t) => t.policyId && demoIds.has(t.policyId))
-                .map(card)}
-            </div>
-            <h2>Other responsibilities</h2>
-            <div className="employee-task-grid">
-              {state.tasks
-                .filter((t) => !t.policyId || !demoIds.has(t.policyId))
-                .map(card)}
-            </div>
-            <h2>Policies requiring attention</h2>
-            {active
-              .filter((p) => !p.demo && p.review !== "Reviewed")
-              .map((p) => (
-                <p key={p.id}>
-                  <button
-                    className="text-link"
-                    onClick={() => setSelected(p.id)}
-                  >
-                    {p.title} · {p.review}
-                  </button>
-                </p>
-              ))}
-            <h2>Recent activity</h2>
-            {state.activity.length ? (
-              state.activity.slice(0, 5).map((a, i) => <p key={i}>{a}</p>)
-            ) : (
-              <p>No changes yet.</p>
-            )}
-          </>
-        )}
-        {(view === "policies" || view === "analyze") && (
-          <>
-            <h1>{view === "policies" ? "Policies" : "Analyze a Policy"}</h1>
-            <p>
-              Choose one of the two fictional examples, or add a public-source
-              document. Sample analyses are prepared examples, not live AI.
-            </p>
-            <div className="detail-tools">
-              <button
-                className="btn primary"
-                onClick={() => setImporting("import")}
-              >
-                Import Policy
-              </button>
-              <button
-                className="btn secondary"
-                onClick={() => setImporting("paste")}
-              >
-                Copy &amp; Paste Policy
-              </button>
-              <button
-                className="btn secondary"
-                onClick={() => setArchive(!archive)}
-              >
-                {archive ? "Show Active Policies" : "View Archived Policies"}
-              </button>
-            </div>
-            <Field label="Search policy name or source">
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </Field>
-            {[true, false].map((demo) => (
-              <section key={String(demo)}>
-                <h2>
-                  {demo
-                    ? "Fictional demonstration policies"
-                    : "Uploaded public policies"}
-                </h2>
-                {state.policies
-                  .filter(
-                    (p) =>
-                      p.demo === demo &&
-                      p.archived === archive &&
-                      `${p.title} ${p.source}`
-                        .toLowerCase()
-                        .includes(search.toLowerCase()),
-                  )
-                  .map((p) => (
-                    <article className="simple-policy" key={p.id}>
-                      <div>
-                        {p.demo && <strong>{DEMO_LABEL}</strong>}
-                        <h3>{p.title}</h3>
-                        <p>
-                          {p.review} · Version {p.versions.length} · Added{" "}
-                          {formatDate(p.createdAt)}
-                        </p>
-                        <p>
-                          Reported effective date:{" "}
-                          {p.reportedDate
-                            ? `${p.reportedDate} (unverified)`
-                            : "Not verified"}
-                        </p>
-                        {p.source && (
-                          <OfficialLink url={p.source}>
-                            Original source
-                          </OfficialLink>
-                        )}
-                      </div>
-                      <div className="detail-tools">
-                        <button
-                          className="btn secondary"
-                          onClick={() => setSelected(p.id)}
-                        >
-                          View Policy
-                        </button>
-                        {!p.archived && (
-                          <button
-                            className="btn primary"
-                            disabled={busy}
-                            onClick={() => analyze(p)}
-                          >
-                            Analyze Policy
-                          </button>
-                        )}
-                        {p.archived && (
-                          <button
-                            className="btn secondary"
-                            onClick={() =>
-                              updatePolicy({ ...p, archived: false })
-                            }
-                          >
-                            Restore Policy
-                          </button>
-                        )}
-                      </div>
-                    </article>
-                  ))}
-                {!demo && !state.policies.some((p) => !p.demo) && (
-                  <p>
-                    No public policies have been added yet. Import a policy or
-                    paste policy text to get started.
-                  </p>
-                )}
-              </section>
-            ))}
-          </>
-        )}
-        {view === "tasks" && (
-          <>
-            <h1>Tasks</h1>
-            <p>
-              Change a status to update its progress. Percentages represent
-              status, not an independent estimate of work.
-            </p>
-            <button
-              className="btn primary"
-              onClick={() => setTask(blankTask(""))}
-            >
-              Create Task
-            </button>
-            {[true, false].map((demo) => (
-              <section key={String(demo)}>
-                <h2>
-                  {demo
-                    ? "DEMO — Fictional tasks"
-                    : "General and uploaded-policy tasks"}
-                </h2>
-                <div className="employee-task-grid">
-                  {state.tasks
-                    .filter(
-                      (t) =>
-                        (!!t.policyId && demoIds.has(t.policyId)) === demo &&
-                        (!t.policyId ||
-                          active.some((p) => p.id === t.policyId)),
+                    {[
+                      ["all", "All tasks — earliest dates first"],
+                      ["overdue", "Overdue"],
+                      ["upcoming", "Upcoming"],
+                      ["undated", "No target date"],
+                      ["blocked", "Blocked"],
+                      ["completed", "Completed"],
+                    ].map(([v, label]) => (
+                      <option key={v} value={v}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+              {[true, false].map((demo) => (
+                <section key={String(demo)}>
+                  <h2>
+                    {demo
+                      ? "DEMO — Fictional tasks"
+                      : "General and uploaded-policy tasks"}
+                  </h2>
+                  <div className="employee-task-grid">
+                    {(demoRole === "Scheduling"
+                      ? scheduleTasks(
+                          visibleTasks,
+                          scheduleFilter,
+                          new Date().toLocaleDateString("en-CA", {
+                            timeZone: "America/Los_Angeles",
+                          }),
+                        )
+                      : state.tasks
                     )
-                    .map(card)}
-                </div>
-              </section>
-            ))}
-          </>
-        )}
-        <button
-          className="btn secondary"
-          onClick={() => {
-            const a = document.createElement("a"),
-              url = URL.createObjectURL(
-                new Blob([JSON.stringify(state, null, 2)], {
-                  type: "application/json",
-                }),
-              );
-            a.href = url;
-            a.download = "housing-navigator-browser-backup.json";
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-          }}
-        >
-          Export Browser Records
-        </button>
-        <p className="muted">
-          Student prototype. No City adoption, legal approval, or compliance
-          certification is implied.
-        </p>
-      </main>
+                      .filter(
+                        (t) =>
+                          (!!t.policyId && demoIds.has(t.policyId)) === demo &&
+                          (!t.policyId ||
+                            active.some((p) => p.id === t.policyId)),
+                      )
+                      .map(card)}
+                  </div>
+                </section>
+              ))}
+            </>
+          )}
+          <button
+            className="btn secondary"
+            onClick={() => {
+              const a = document.createElement("a"),
+                url = URL.createObjectURL(
+                  new Blob([JSON.stringify(state, null, 2)], {
+                    type: "application/json",
+                  }),
+                );
+              a.href = url;
+              a.download = "housing-navigator-browser-backup.json";
+              a.click();
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }}
+          >
+            Export Browser Records
+          </button>
+          <p className="muted">
+            Student prototype. No City adoption, legal approval, or compliance
+            certification is implied.
+          </p>
+        </main>
       </div>
       {policy && (
         <Modal title="Policy Details" wide onClose={() => setSelected("")}>
