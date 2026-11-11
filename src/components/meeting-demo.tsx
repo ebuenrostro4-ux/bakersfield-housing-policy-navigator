@@ -9,7 +9,7 @@ import {
   type DemoRole,
 } from "@/lib/demo-roles";
 import RestoredWelcome from "./restored-welcome";
-import SourceReader from "./source-reader";
+import PolicyDetails from "./policy-details";
 import { PUBLIC_DOCUMENT_LIMITS, PUBLIC_DOCUMENT_HELP } from "@/lib/document-limits";
 import {
   LayoutDashboard,
@@ -133,6 +133,7 @@ export default function MeetingDemo() {
     [importing, setImporting] = useState<"import" | "paste" | null>(null),
     [task, setTask] = useState<Task | null>(null),
     [plan, setPlan] = useState<DemoPolicy | null>(null),
+    [planAction, setPlanAction] = useState<number | undefined>(undefined),
     [reset, setReset] = useState(false),
     [search, setSearch] = useState(""),
     [archive, setArchive] = useState(false);
@@ -217,13 +218,10 @@ export default function MeetingDemo() {
     );
   }
   async function analyze(p: DemoPolicy) {
-    await updatePolicy({
-      ...p,
-      analysis: meetingAnalysis(p),
-      review: "Pending Review",
-      updatedAt: new Date().toISOString(),
-    });
+    const next = { ...p, analysis: meetingAnalysis(p), review: "Pending Review", updatedAt: new Date().toISOString() };
+    await updatePolicy(next);
     setSelected(p.id);
+    return next;
   }
   function card(t: Task) {
     return (
@@ -799,141 +797,29 @@ export default function MeetingDemo() {
         </main>
       </div>
       {policy && (
-        <Modal title="Policy Details" wide onClose={() => setSelected("")}>
-          <div className="modal-body form-stack">
-            {policy.demo && (
-              <div className="notice">
-                <strong>{DEMO_LABEL}</strong>
-                <p>
-                  This is fictional material for demonstrating website
-                  functionality. It is not a California law or an official City
-                  policy.
-                </p>
-              </div>
-            )}
-            <h2>{policy.title}</h2>
-            <SourceReader key={policy.updatedAt} text={policy.text} />
-            <p>{policy.notes}</p>
-            <button
-              className="btn primary"
-              disabled={busy}
-              onClick={() => analyze(policy)}
-            >
-              Analyze Policy
-            </button>
-            {policy.analysis && (
-              <>
-                <p className="notice">
-                  {policy.demo
-                    ? "Sample analysis of a fictional scenario — no live AI used."
-                    : policy.analysis.documentReview
-                      ? `Free source review · ${policy.analysis.documentReview.characters.toLocaleString()} characters scanned across ${policy.analysis.documentReview.sections} text sections.`
-                      : "Saved excerpt review. Select Analyze Policy to scan the full text."}
-                </p>
-                <p>
-                  Verify highlighted passages against the official source before taking action.
-                </p>
-                {policy.analysis.warnings.map((warning, i) => <p key={i}>{warning}</p>)}
-                {(
-                  [
-                    "summary",
-                    "plainEnglish",
-                    "changes",
-                    "impacts",
-                    "actions",
-                    "dates",
-                  ] as const
-                ).filter((key) => !policy.analysis?.documentReview || ["summary", "actions", "dates"].includes(key)).map((key) => (
-                  <section key={key}>
-                    <h3>
-                      {
-                        {
-                          summary: policy.analysis?.documentReview ? "Key source passages" : "Simple summary",
-                          plainEnglish: "In plain English",
-                          changes: "What changed?",
-                          impacts: "Potential impact",
-                          actions: policy.analysis?.documentReview ? "Possible requirements to review" : "Recommended next steps",
-                          dates: "Date and timing passages (unverified)",
-                        }[key]
-                      }
-                    </h3>
-                    {policy.analysis![key].length ? (
-                      policy.analysis![key].map((c, i) => (
-                        <div key={i}>
-                          {c.sourceLabel && <strong>{c.sourceLabel}</strong>}
-                          {c.text !== c.quote && <p>{c.text}</p>}
-                          <blockquote>{c.quote}</blockquote>
-                        </div>
-                      ))
-                    ) : (
-                      <p>
-                        No supported{" "}
-                        {key === "changes" ? "historical change" : "finding"}{" "}
-                        established.
-                      </p>
-                    )}
-                  </section>
-                ))}
-                <h3>Questions and uncertainties</h3>
-                {policy.analysis.questions.map((q) => (
-                  <p key={q}>{q}</p>
-                ))}
-                <button
-                  className="btn primary"
-                  disabled={!policy.analysis.actions.length}
-                  onClick={() => {
-                    setPlan(policy);
-                    setSelected("");
-                  }}
-                >
-                  Create Action Plan
-                </button>
-                <ReviewForm policy={policy} save={updatePolicy} />
-              </>
-            )}
-            <details>
-              <summary>Uploaded version history</summary>
-              {policy.versions.map((v) => (
-                <section key={v.number}>
-                  <h4>
-                    Version {v.number} · {formatDate(v.at)}
-                  </h4>
-                  <SourceReader text={v.text} label={`Version ${v.number} source`} />
-                </section>
-              ))}
-              <p>
-                Upload history does not verify that a law changed or is current.
-              </p>
-            </details>
-            {!policy.demo && (
-              <button
-                className="btn secondary"
-                onClick={() => {
-                  setSelected("");
-                  setImporting("paste");
-                }}
-              >
-                Import an Updated Version
-              </button>
-            )}
-            <button
-              className="btn secondary"
-              disabled={policy.demo}
-              onClick={async () => {
-                if (
-                  window.confirm(
-                    "Archive this policy? Its source, history and tasks will be retained.",
-                  )
-                ) {
-                  await updatePolicy({ ...policy, archived: true });
-                  setSelected("");
-                }
-              }}
-            >
-              Archive Policy
-            </button>
-          </div>
-        </Modal>
+        <PolicyDetails
+          key={policy.id}
+          policy={policy}
+          busy={busy}
+          onClose={() => setSelected("")}
+          onAnalyze={async () => { await analyze(policy); }}
+          onCreatePlan={async (index) => {
+            const ready = policy.analysis ? policy : await analyze(policy);
+            setPlan(ready);
+            setPlanAction(index);
+            setSelected("");
+          }}
+          review={<ReviewForm policy={policy} save={updatePolicy} />}
+          management={!policy.demo && <>
+            <button className="btn secondary" onClick={() => { setSelected(""); setImporting("paste"); }}>Import an Updated Version</button>
+            <button className="btn secondary" disabled={busy} onClick={async () => {
+              if (window.confirm("Archive this policy? Its source, history and tasks will be retained.")) {
+                await updatePolicy({ ...policy, archived: true });
+                setSelected("");
+              }
+            }}>Archive Policy</button>
+          </>}
+        />
       )}
       {importing && (
         <PublicImport
@@ -1007,6 +893,8 @@ export default function MeetingDemo() {
       {plan && (
         <ActionPlan
           policy={plan}
+          existingTasks={state.tasks}
+          initialAction={planAction}
           close={() => setPlan(null)}
           save={async (rows) => {
             const tasks = [...state.tasks];
@@ -1020,6 +908,7 @@ export default function MeetingDemo() {
                 assignee: r.assignee,
                 priority: r.priority,
                 dueDate: r.dueDate || null,
+                sourceQuote: plan.analysis?.actions[r.index]?.quote || old?.sourceQuote || "",
               };
               const at = tasks.findIndex((t) => t.id === id);
               if (at >= 0) tasks[at] = next;
@@ -1401,10 +1290,14 @@ function PublicImport({
 }
 function ActionPlan({
   policy,
+  existingTasks,
+  initialAction,
   close,
   save,
 }: {
   policy: DemoPolicy;
+  existingTasks: Task[];
+  initialAction?: number;
   close: () => void;
   save: (
     rows: {
@@ -1417,13 +1310,15 @@ function ActionPlan({
   ) => Promise<void>;
 }) {
   const [rows, setRows] = useState(
-      policy.analysis!.actions.map((a, index) => ({
+      policy.analysis!.actions.map((a, index) => {
+        const existing = existingTasks.find((task) => task.id === `${policy.id}-action-${index}`);
+        return ({
         index,
-        title: a.text.split(" Reason:")[0],
-        assignee: policy.demo ? "Example housing team" : "",
-        priority: "Normal",
-        dueDate: "",
-      })),
+        title: existing?.title || a.text.split(" Reason:")[0],
+        assignee: existing?.assignee ?? (policy.demo ? "Example housing team" : ""),
+        priority: existing?.priority || "Normal",
+        dueDate: existing?.dueDate || "",
+      }); }).filter((row) => initialAction === undefined || row.index === initialAction),
     ),
     [error, setError] = useState("");
   return (
@@ -1452,7 +1347,7 @@ function ActionPlan({
         </p>
         {rows.map((r, i) => (
           <section className="employee-task-card" key={r.index}>
-            <Field label={`Action ${i + 1}`}>
+            <Field label={`Action ${r.index + 1}`}>
               <input
                 required
                 value={r.title}
@@ -1466,7 +1361,7 @@ function ActionPlan({
                 }
               />
             </Field>
-            <Field label={`Responsible person for action ${i + 1}`}>
+            <Field label={`Responsible person for action ${r.index + 1}`}>
               <input
                 value={r.assignee}
                 maxLength={120}
@@ -1479,7 +1374,7 @@ function ActionPlan({
                 }
               />
             </Field>
-            <Field label={`Priority for action ${i + 1}`}>
+            <Field label={`Priority for action ${r.index + 1}`}>
               <select
                 value={r.priority}
                 onChange={(e) =>
@@ -1495,8 +1390,8 @@ function ActionPlan({
                 ))}
               </select>
             </Field>
-            <Field label={`Staff target for action ${i + 1}`}>
-              <input type="date" name={`due-${r.index}`} />
+            <Field label={`Staff target for action ${r.index + 1}`}>
+              <input type="date" name={`due-${r.index}`} defaultValue={r.dueDate} />
             </Field>
             <blockquote>{policy.analysis!.actions[r.index].quote}</blockquote>
           </section>
