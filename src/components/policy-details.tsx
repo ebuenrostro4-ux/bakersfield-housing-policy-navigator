@@ -10,7 +10,7 @@ import type { Claim } from "@/lib/types";
 const tabs = ["Summary", "Policy Text", "What Changed", "Impact"] as const;
 type Tab = typeof tabs[number];
 
-function Evidence({ claim, reason }: { claim: Claim; reason?: string }) {
+export function PolicyEvidence({ claim, reason }: { claim: Claim; reason?: string }) {
   return <details className="policy-evidence">
     <summary>{reason ? "Reason and supporting passage" : "Supporting passage"}</summary>
     {reason && <p>{reason}</p>}
@@ -84,7 +84,7 @@ export default function PolicyDetails({ policy, busy, onClose, onAnalyze, onCrea
             <button type="button" onClick={() => setTab(analysis ? "Impact" : "Policy Text")}>{analysis ? "Review next steps" : "Read policy text"}<ArrowRight size={18} /></button>
           </div>
           {analysis && <details className="policy-detail-card"><summary>Summary evidence{summary.length > 1 ? " and additional passages" : ""}</summary>
-            {summary.map((claim, index) => <div className="policy-claim" key={index}>{index > 0 && <p>{claim.text}</p>}<Evidence claim={claim} /></div>)}
+            {summary.map((claim, index) => <div className="policy-claim" key={index}>{index > 0 && <p>{claim.text}</p>}<PolicyEvidence claim={claim} /></div>)}
           </details>}
           {analysis && <details className="policy-detail-card"><summary>Questions and review notes</summary>
             {analysis.questions.length > 0 && <ul>{analysis.questions.map((question, index) => <li key={index}>{question}</li>)}</ul>}
@@ -111,17 +111,17 @@ export default function PolicyDetails({ policy, busy, onClose, onAnalyze, onCrea
 
         <section role="tabpanel" id={`${id}-panel-2`} aria-labelledby={`${id}-tab-2`} hidden={tab !== "What Changed"} tabIndex={0} className="policy-tab-panel">
           <div className="policy-detail-card"><h3><History size={20} />Historical changes</h3><p>No verified historical changes found.</p><p className="policy-secondary">A reliable comparison of official versions is needed. Saved uploads and analysis suggestions do not establish a legal change.</p></div>
-          {!!analysis?.changes.length && <div className="policy-detail-card"><h3>Comparison passages awaiting verification</h3>{analysis.changes.map((claim, index) => <div className="policy-claim" key={index}><p>{claim.text}</p><Evidence claim={claim} /></div>)}</div>}
+          {!!analysis?.changes.length && <div className="policy-detail-card"><h3>Comparison passages awaiting verification</h3>{analysis.changes.map((claim, index) => <div className="policy-claim" key={index}><p>{claim.text}</p><PolicyEvidence claim={claim} /></div>)}</div>}
         </section>
 
         <section role="tabpanel" id={`${id}-panel-3`} aria-labelledby={`${id}-tab-3`} hidden={tab !== "Impact"} tabIndex={0} className="policy-tab-panel">
           <article className="policy-detail-card"><h3><Users size={20} />Potential Impact</h3>
-            {analysis?.impacts.length ? analysis.impacts.map((claim, index) => <div className="policy-claim" key={index}><p>{claim.text}</p><Evidence claim={claim} /></div>) : <p>{analysis ? "No supported impact assessment is available. Review the source with the responsible team." : "Analyze this policy to view available findings."}</p>}
+            {analysis?.impacts.length ? analysis.impacts.map((claim, index) => <div className="policy-claim" key={index}><p>{claim.text}</p><PolicyEvidence claim={claim} /></div>) : <p>{analysis ? "No supported impact assessment is available. Review the source with the responsible team." : "Analyze this policy to view available findings."}</p>}
           </article>
           <article className="policy-detail-card"><h3><ListChecks size={20} />Recommended Next Steps</h3>
             {analysis?.actions.length ? <><ol className="policy-action-list">{analysis.actions.map((claim, index) => {
               const [action, ...reason] = claim.text.split(" Reason:");
-              return <li key={index}><p>{action}</p><Evidence claim={claim} reason={reason.join(" Reason:")} /><button type="button" className="btn secondary" disabled={locked} onClick={() => createPlan(index)}>Create Task from Action {index + 1}</button></li>;
+              return <li key={index}><p>{action}</p><PolicyEvidence claim={claim} reason={reason.join(" Reason:")} /><button type="button" className="btn secondary" disabled={locked} onClick={() => createPlan(index)}>Create Task from Action {index + 1}</button></li>;
             })}</ol><button type="button" className="btn primary" disabled={locked} onClick={() => createPlan()}>Create Action Plan</button></> : <p>No supported action recommendations available. Read the policy and record any staff decisions through the existing task tools.</p>}
           </article>
           {!!analysis?.dates.length && <details className="policy-detail-card"><summary>Date and timing passages · unverified</summary>{analysis.dates.map((claim, index) => <div className="policy-claim" key={index}><blockquote>{claim.quote}</blockquote>{claim.sourceLabel && <small>{claim.sourceLabel}</small>}</div>)}<p>Quoted dates are not verified legal deadlines. Task dates remain staff targets.</p></details>}

@@ -4,12 +4,15 @@ import Link from "next/link";
 import {
   demoRole as parseDemoRole,
   roleDetails,
-  scheduleTasks,
   DEMO_ROLES,
   type DemoRole,
 } from "@/lib/demo-roles";
 import RestoredWelcome from "./restored-welcome";
 import PolicyDetails from "./policy-details";
+import PolicyReview from "./policy-review";
+import PlannerWorkspace from "./planner-workspace";
+import ReviewerWorkspace from "./reviewer-workspace";
+import SchedulingWorkspace from "./scheduling-workspace";
 import { PUBLIC_DOCUMENT_LIMITS, PUBLIC_DOCUMENT_HELP } from "@/lib/document-limits";
 import {
   LayoutDashboard,
@@ -21,6 +24,10 @@ import {
   X,
   Building2,
   ChevronRight,
+  CalendarDays,
+  ClipboardCheck,
+  SearchCheck,
+  Users,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Brand, Modal, Field, OfficialLink, formatDate } from "./ui";
@@ -109,14 +116,14 @@ export default function MeetingDemo() {
     }
     setEntryReady(true);
   }, []);
-  const [reviewFilter, setReviewFilter] = useState("all"),
-    [scheduleFilter, setScheduleFilter] = useState("all");
+  const [reviewFilter, setReviewFilter] = useState("all");
   const roleInfo = roleDetails[demoRole];
   function switchRole(role: DemoRole) {
     sessionStorage.setItem("navigator-demo-entry-v1", role);
     setDemoRole(role);
     setReviewFilter("all");
-    setScheduleFilter("all");
+    setNotice("");
+    window.requestAnimationFrame(() => window.scrollTo(0, 0));
   }
   useEffect(() => {
     const close = (e: KeyboardEvent) => {
@@ -143,7 +150,7 @@ export default function MeetingDemo() {
         const next = saved || demoInitialState();
         if (!Array.isArray(next.policies) || !Array.isArray(next.tasks))
           throw new Error(
-            "Saved browser data could not be read. Export/recovery is needed before replacing it.",
+            "Saved browser data could not be read. Keep existing site data for recovery; do not clear it.",
           );
         if (!saved) await writeSaved(next);
         setState(next);
@@ -163,7 +170,7 @@ export default function MeetingDemo() {
       setNotice(message);
     } catch (e) {
       setError(
-        "Save failed. Your changes were not applied. Export your existing records before clearing browser storage.",
+        "Save failed. Your changes were not applied. Keep existing site data and try again.",
       );
       throw e;
     } finally {
@@ -218,10 +225,17 @@ export default function MeetingDemo() {
     );
   }
   async function analyze(p: DemoPolicy) {
-    const next = { ...p, analysis: meetingAnalysis(p), review: "Pending Review", updatedAt: new Date().toISOString() };
+    const at = new Date().toISOString();
+    const next = { ...p, analysis: meetingAnalysis(p), review: "Pending Review", analysisSubmittedAt: at, updatedAt: at };
     await updatePolicy(next);
     setSelected(p.id);
     return next;
+  }
+  async function openPlan(p: DemoPolicy, index?: number) {
+    const ready = p.analysis ? p : await analyze(p);
+    setPlan(ready);
+    setPlanAction(index);
+    setSelected("");
   }
   function card(t: Task) {
     return (
@@ -242,8 +256,7 @@ export default function MeetingDemo() {
         {t.policyId && (
           <p>
             Related policy:{" "}
-            {state!.policies.find((p) => p.id === t.policyId)?.title ||
-              "Archived policy"}
+            <button className="text-link" onClick={() => setSelected(t.policyId!)}>{state!.policies.find((p) => p.id === t.policyId)?.title || "Archived policy"}</button>
           </p>
         )}
         <TaskProgress task={t} />
@@ -311,10 +324,10 @@ export default function MeetingDemo() {
         </Link>
         <nav aria-label="Main navigation">
           {[
-            ["/", "Home", LayoutDashboard],
-            ["/library", roleInfo.policies, Library],
-            ["/analyzer", roleInfo.analyzer, Sparkles],
-            ["/tracker", roleInfo.tasks, ListChecks],
+            ["/", roleInfo.home, demoRole === "Reviewer" ? ClipboardCheck : LayoutDashboard],
+            ["/library", roleInfo.policies, demoRole === "Scheduling" ? Users : Library],
+            ["/analyzer", roleInfo.analyzer, demoRole === "Scheduling" ? ListChecks : demoRole === "Reviewer" ? SearchCheck : Sparkles],
+            ["/tracker", roleInfo.tasks, demoRole === "Scheduling" ? CalendarDays : ListChecks],
           ].map(([url, label, Icon]) => {
             const Glyph = Icon as typeof LayoutDashboard;
             return (
@@ -367,7 +380,7 @@ export default function MeetingDemo() {
             <strong>
               {
                 {
-                  home: "Home",
+                  home: roleInfo.home,
                   policies: roleInfo.policies,
                   analyze: roleInfo.analyzer,
                   tasks: roleInfo.tasks,
@@ -407,187 +420,22 @@ export default function MeetingDemo() {
           )}
           {notice && <p role="status">{notice}</p>}
           {view === "home" && demoRole === "Planner" && (
-            <>
-              <h1>{roleInfo.title}</h1>
-              <p>
-                Try either fictional policy, review the sample analysis, create
-                an action plan, and change task statuses. The progress bar
-                follows automatically.
-              </p>
-              <div className="detail-tools">
-                <button
-                  className="btn primary"
-                  onClick={() => setImporting("import")}
-                >
-                  Import Policy
-                </button>
-                <button
-                  className="btn secondary"
-                  onClick={() => setImporting("paste")}
-                >
-                  Paste Policy
-                </button>
-                <button
-                  className="btn secondary"
-                  onClick={() => setTask(blankTask(""))}
-                >
-                  Create Task
-                </button>
-              </div>
-              <h2>Two demonstration policies</h2>
-              {active
-                .filter((p) => p.demo)
-                .map((p) => (
-                  <article className="simple-policy" key={p.id}>
-                    <div>
-                      <strong>{DEMO_LABEL}</strong>
-                      <h3>{p.title}</h3>
-                      <p>
-                        Fictional administrative scenario for demonstrating the
-                        workflow.
-                      </p>
-                    </div>
-                    <button
-                      className="btn primary"
-                      onClick={() => setSelected(p.id)}
-                    >
-                      Open Demo Policy
-                    </button>
-                  </article>
-                ))}
-              <h2>Demonstration tasks</h2>
-              <div className="employee-task-grid">
-                {state.tasks
-                  .filter((t) => t.policyId && demoIds.has(t.policyId))
-                  .map(card)}
-              </div>
-              <h2>Other responsibilities</h2>
-              <div className="employee-task-grid">
-                {state.tasks
-                  .filter((t) => !t.policyId || !demoIds.has(t.policyId))
-                  .map(card)}
-              </div>
-              <h2>Policies requiring attention</h2>
-              {active
-                .filter((p) => !p.demo && p.review !== "Reviewed")
-                .map((p) => (
-                  <p key={p.id}>
-                    <button
-                      className="text-link"
-                      onClick={() => setSelected(p.id)}
-                    >
-                      {p.title} · {p.review}
-                    </button>
-                  </p>
-                ))}
-              <h2>Recent activity</h2>
-              {state.activity.length ? (
-                state.activity.slice(0, 5).map((a, i) => <p key={i}>{a}</p>)
-              ) : (
-                <p>No changes yet.</p>
-              )}
-            </>
+            <PlannerWorkspace policies={active} tasks={visibleTasks} busy={busy}
+              onImport={setImporting} onOpen={(p) => setSelected(p.id)}
+              onAnalyze={async (p) => { await analyze(p); }}
+              onCreateTask={() => setTask(blankTask(""))}
+              onCreatePlan={openPlan} onViewTask={setTask} />
           )}
-          {view === "home" && demoRole === "Reviewer" && (
-            <>
-              <h1>{roleInfo.title}</h1>
-              <p>{roleInfo.description}</p>
-              <h2>Review queue</h2>
-              <p>
-                {
-                  active.filter((p) => p.analysis && p.review !== "Reviewed")
-                    .length
-                }{" "}
-                analyses awaiting review ·{" "}
-                {active.filter((p) => !p.analysis).length} policies need
-                analysis ·{" "}
-                {active.filter((p) => p.review === "Needs Revision").length}{" "}
-                need revision
-              </p>
-              {active
-                .filter((p) => p.review !== "Reviewed")
-                .map((p) => (
-                  <article className="simple-policy" key={p.id}>
-                    <div>
-                      {p.demo && <strong>{DEMO_LABEL}</strong>}
-                      <h3>{p.title}</h3>
-                      <p>
-                        {p.review}
-                        {p.reviewer ? ` · Entered reviewer: ${p.reviewer}` : ""}
-                      </p>
-                    </div>
-                    <button
-                      className="btn primary"
-                      onClick={() => setSelected(p.id)}
-                    >
-                      {p.analysis
-                        ? "Review Evidence and Analysis"
-                        : "Open Source for Review"}
-                    </button>
-                  </article>
-                ))}
-              {!active.some((p) => p.review !== "Reviewed") && (
-                <p>No policies awaiting review.</p>
-              )}
-              <p>
-                Open a policy to read its source and supporting passages, record
-                your name and review notes, and select Reviewed or Needs
-                Revision. Names are demonstration labels, not authenticated
-                approvals.
-              </p>
-            </>
+          {demoRole === "Reviewer" && (view === "home" || view === "analyze") && (
+            <ReviewerWorkspace policies={active} onOpen={(p) => setSelected(p.id)} />
           )}
-          {view === "home" && demoRole === "Scheduling" && (
-            <>
-              <h1>{roleInfo.title}</h1>
-              <p>{roleInfo.description}</p>
-              <button
-                className="btn primary"
-                onClick={() => setTask(blankTask(""))}
-              >
-                Create Scheduled Task
-              </button>
-              <h2>Deadline overview</h2>
-              <p>
-                Includes the labeled demonstration tasks and your saved
-                responsibilities.
-              </p>
-              <p>
-                {
-                  scheduleTasks(
-                    visibleTasks,
-                    "overdue",
-                    new Date().toLocaleDateString("en-CA", {
-                      timeZone: "America/Los_Angeles",
-                    }),
-                  ).length
-                }{" "}
-                overdue ·{" "}
-                {
-                  scheduleTasks(
-                    visibleTasks,
-                    "upcoming",
-                    new Date().toLocaleDateString("en-CA", {
-                      timeZone: "America/Los_Angeles",
-                    }),
-                  ).length
-                }{" "}
-                upcoming ·{" "}
-                {visibleTasks.filter((t) => t.status === "Blocked").length}{" "}
-                blocked · {scheduleTasks(visibleTasks, "undated", "").length}{" "}
-                without a date
-              </p>
-              <p>
-                Open a task to enter its responsible person and staff target
-                date. Tasks with dates appear first. No legal deadlines are
-                inferred.
-              </p>
-              <div className="employee-task-grid">
-                {scheduleTasks(visibleTasks, "all", "").slice(0, 8).map(card)}
-              </div>
-            </>
+          {demoRole === "Scheduling" && (
+            <SchedulingWorkspace key={path} tasks={visibleTasks}
+              initialView={view === "home" || view === "tasks" ? "calendar" : "list"}
+              onCreate={(date) => setTask({ ...blankTask(""), dueDate: date || null })}
+              onOpen={setTask} renderTask={card} />
           )}
-          {(view === "policies" || view === "analyze") && (
+          {(view === "policies" || view === "analyze") && demoRole !== "Scheduling" && !(demoRole === "Reviewer" && view === "analyze") && (
             <>
               <h1>
                 {view === "policies" ? roleInfo.policies : roleInfo.analyzer}
@@ -718,75 +566,15 @@ export default function MeetingDemo() {
               ))}
             </>
           )}
-          {view === "tasks" && (
+          {view === "tasks" && demoRole !== "Scheduling" && (
             <>
               <h1>{roleInfo.tasks}</h1>
-              <p>
-                {demoRole === "Scheduling"
-                  ? roleInfo.description
-                  : demoRole === "Reviewer"
-                    ? "Inspect responsibilities related to the policies you review. Open the related policy for source and review notes."
-                    : "Track actions from policy plans and general planning responsibilities."}
-              </p>
-              <p>
-                Change a status to update its progress. Percentages represent
-                status, not an independent estimate of work.
-              </p>
-              <button
-                className="btn primary"
-                onClick={() => setTask(blankTask(""))}
-              >
-                Create Task
-              </button>
-              {demoRole === "Scheduling" && (
-                <Field label="Schedule filter">
-                  <select
-                    value={scheduleFilter}
-                    onChange={(e) => setScheduleFilter(e.target.value)}
-                  >
-                    {[
-                      ["all", "All tasks — earliest dates first"],
-                      ["overdue", "Overdue"],
-                      ["upcoming", "Upcoming"],
-                      ["undated", "No target date"],
-                      ["blocked", "Blocked"],
-                      ["completed", "Completed"],
-                    ].map(([v, label]) => (
-                      <option key={v} value={v}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              )}
-              {[true, false].map((demo) => (
-                <section key={String(demo)}>
-                  <h2>
-                    {demo
-                      ? "DEMO — Fictional tasks"
-                      : "General and uploaded-policy tasks"}
-                  </h2>
-                  <div className="employee-task-grid">
-                    {(demoRole === "Scheduling"
-                      ? scheduleTasks(
-                          visibleTasks,
-                          scheduleFilter,
-                          new Date().toLocaleDateString("en-CA", {
-                            timeZone: "America/Los_Angeles",
-                          }),
-                        )
-                      : state.tasks
-                    )
-                      .filter(
-                        (t) =>
-                          (!!t.policyId && demoIds.has(t.policyId)) === demo &&
-                          (!t.policyId ||
-                            active.some((p) => p.id === t.policyId)),
-                      )
-                      .map(card)}
-                  </div>
-                </section>
-              ))}
+              <p>{demoRole === "Reviewer" ? "Inspect responsibilities connected to the policies you review." : "Track implementation actions and planning responsibilities."}</p>
+              <button className="btn primary" onClick={() => setTask(blankTask(""))}>Create Task</button>
+              {[true, false].map((demo) => <section key={String(demo)}>
+                <h2>{demo ? "DEMO — Fictional tasks" : "General and uploaded-policy tasks"}</h2>
+                <div className="employee-task-grid">{visibleTasks.filter((t) => (!!t.policyId && demoIds.has(t.policyId)) === demo).map(card)}</div>
+              </section>)}
             </>
           )}
           <details className="simple-disclosure">
@@ -796,20 +584,19 @@ export default function MeetingDemo() {
           </details>
         </main>
       </div>
-      {policy && (
+      {policy && (demoRole === "Reviewer" ? (
+        <PolicyReview key={policy.id} policy={policy} busy={busy}
+          onClose={() => setSelected("")} onAnalyze={async () => { await analyze(policy); }}
+          review={<ReviewForm policy={policy} save={updatePolicy} busy={busy} />} />
+      ) : (
         <PolicyDetails
           key={policy.id}
           policy={policy}
           busy={busy}
           onClose={() => setSelected("")}
           onAnalyze={async () => { await analyze(policy); }}
-          onCreatePlan={async (index) => {
-            const ready = policy.analysis ? policy : await analyze(policy);
-            setPlan(ready);
-            setPlanAction(index);
-            setSelected("");
-          }}
-          review={<ReviewForm policy={policy} save={updatePolicy} />}
+          onCreatePlan={async (index) => { await openPlan(policy, index); }}
+          review={<ReviewForm policy={policy} save={updatePolicy} busy={busy} />}
           management={!policy.demo && <>
             <button className="btn secondary" onClick={() => { setSelected(""); setImporting("paste"); }}>Import an Updated Version</button>
             <button className="btn secondary" disabled={busy} onClick={async () => {
@@ -820,7 +607,7 @@ export default function MeetingDemo() {
             }}>Archive Policy</button>
           </>}
         />
-      )}
+      ))}
       {importing && (
         <PublicImport
           mode={importing}
@@ -844,6 +631,7 @@ export default function MeetingDemo() {
               reviewer: "",
               reviewDate: "",
               comments: "",
+              reviewConcerns: "",
               createdAt: existing?.createdAt || at,
               updatedAt: at,
               versions: [
@@ -957,68 +745,37 @@ export default function MeetingDemo() {
     </div>
   );
 }
-function ReviewForm({
-  policy,
-  save,
-}: {
-  policy: DemoPolicy;
-  save: (p: DemoPolicy) => Promise<void>;
+function ReviewForm({ policy, save, busy }: {
+  policy: DemoPolicy; save: (p: DemoPolicy) => Promise<void>; busy: boolean;
 }) {
-  const [name, setName] = useState(policy.reviewer),
-    [comments, setComments] = useState(policy.comments),
-    [status, setStatus] = useState(policy.review);
-  return (
-    <form
-      className="form-stack"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        await save({
-          ...policy,
-          reviewer: name,
-          comments,
-          review: status,
-          reviewDate: new Date().toISOString(),
-        });
-      }}
-    >
-      <h3>Record a review</h3>
-      <p>
-        Entered names are unverified labels, not authenticated identities or
-        secure approvals.
-      </p>
-      <Field label="Reviewer name">
-        <input
-          value={name}
-          required
-          onChange={(e) => setName(e.target.value)}
-        />
-      </Field>
-      <Field label="Review status">
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
-          {[
-            "Analysis Completed",
-            "Pending Review",
-            "Reviewed",
-            "Needs Revision",
-          ].map((s) => (
-            <option key={s}>{s}</option>
-          ))}
-        </select>
-      </Field>
-      <Field label="Review notes">
-        <textarea
-          value={comments}
-          onChange={(e) => setComments(e.target.value)}
-        />
-      </Field>
-      {policy.reviewDate && (
-        <p>
-          Recorded {formatDate(policy.reviewDate)} by {policy.reviewer}
-        </p>
-      )}
-      <button className="btn secondary">Save Review</button>
-    </form>
-  );
+  const [name, setName] = useState(policy.reviewer), [comments, setComments] = useState(policy.comments),
+    [concerns, setConcerns] = useState(policy.reviewConcerns || ""),
+    [status, setStatus] = useState(policy.review === "Reviewed" || policy.review === "Needs Revision" ? policy.review : "Pending Review"),
+    [error, setError] = useState("");
+  return <form className="form-stack review-decision-form" onSubmit={async (event) => {
+    event.preventDefault(); setError("");
+    const button = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const decision = button?.name === "decision" ? button.value : status;
+    if (decision === "Needs Revision" && !comments.trim() && !concerns.trim()) {
+      setError("Explain what needs correction in the review notes or concerns."); return;
+    }
+    try {
+      await save({ ...policy, reviewer: name.trim(), comments, reviewConcerns: concerns,
+        review: decision, reviewDate: new Date().toISOString() });
+      setStatus(decision);
+    } catch { setError("Review was not saved. Your existing decision is unchanged. Please try again."); }
+  }}>
+    <div><h3>Review Decision</h3><p className="review-identity-note">Demo review only. Entered names are unverified labels, not authenticated employee identities or City approval.</p></div>
+    <div className="review-form-grid">
+      <Field label="Reviewer name"><input value={name} required maxLength={120} onChange={(event) => setName(event.target.value)} /></Field>
+      <Field label="Review status"><select value={status} onChange={(event) => setStatus(event.target.value)}>{["Pending Review", "Reviewed", "Needs Revision"].map((value) => <option key={value}>{value}</option>)}</select></Field>
+    </div>
+    <Field label="Review notes"><textarea value={comments} rows={3} onChange={(event) => setComments(event.target.value)} /></Field>
+    <Field label="Questions or concerns"><textarea value={concerns} rows={2} onChange={(event) => setConcerns(event.target.value)} /></Field>
+    <p>{policy.reviewDate ? `Date reviewed: ${formatDate(policy.reviewDate)} · ${policy.reviewer}` : "Date reviewed: not yet recorded"}</p>
+    {error && <p role="alert" className="error-box">{error}</p>}
+    <div className="workspace-actions"><button className="btn primary" type="submit" name="decision" value="Reviewed" disabled={busy}>Mark Reviewed</button><button className="btn secondary" type="submit" name="decision" value="Needs Revision" disabled={busy}>Needs Revision</button><button className="btn secondary" type="submit" disabled={busy}>Save Review</button></div>
+  </form>;
 }
 function PublicTaskForm({
   task,

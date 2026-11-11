@@ -4430,3 +4430,156 @@ button:disabled { cursor: not-allowed; }
   .policy-details .source-reader-controls { align-items: stretch; }
   .policy-details .source-reader-controls label { flex-wrap: wrap; }
 }
+
+/* Role dashboards share tokens and records, with a different layout for each job. */
+.role-dashboard { display: grid; gap: 24px; margin-bottom: 28px; overflow-wrap: anywhere; }
+.role-page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.role-page-heading h1 { margin: 6px 0 10px; }
+.role-page-heading p { max-width: 780px; font-size: 17px; }
+.role-page-heading > .btn { flex-shrink: 0; }
+.workspace-eyebrow { display: block; color: var(--green); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+.workspace-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.workspace-actions .btn, .role-page-heading > .btn { display: inline-flex; align-items: center; justify-content: center; gap: 9px; }
+.workspace-actions .text-link { padding: 8px 0; min-height: 44px; }
+.workspace-panel { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 22px; min-width: 0; }
+.workspace-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.workspace-section-heading h2 { margin: 0; font-size: 22px; color: var(--green-dark); }
+.workspace-section-heading > a, .workspace-inline-link { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; color: var(--green); text-decoration: underline; text-underline-offset: 4px; }
+.workspace-section-heading > span { font-size: 14px; }
+.workspace-empty { padding: 16px 0; font-size: 16px; }
+.workspace-empty .btn { margin-top: 14px; }
+.workspace-status { display: inline-block; padding: 3px 9px; background: var(--bg); border: 1px solid var(--border); color: var(--green-dark); border-radius: 6px; font-size: 13px; font-weight: 600; }
+.workspace-metric { display: flex; align-items: flex-start; gap: 12px; padding: 18px; background: white; border: 1px solid var(--border); border-radius: 10px; min-width: 0; }
+.workspace-metric > svg { flex-shrink: 0; color: var(--green); margin-top: 7px; }
+.workspace-metric > div { display: grid; gap: 3px; min-width: 0; }
+.workspace-metric strong { color: var(--green-dark); font-size: 30px; line-height: 1.2; }
+.workspace-metric span { font-size: 14px; line-height: 1.4; }
+.planner-columns { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 22px; align-items: start; }
+.planner-policy-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.planner-policy-card { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 20px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); min-width: 0; }
+.planner-policy-card h3 { margin: 0; color: var(--green-dark); font-size: 20px; line-height: 1.35; }
+.planner-policy-card p { font-size: 15px; line-height: 1.6; }
+.planner-policy-card .workspace-actions { margin-top: auto; padding-top: 6px; }
+.planner-policy-card .btn { font-size: 15px; padding: 10px 14px; }
+.planner-overview { display: grid; gap: 14px; }
+.planner-overview h2 { margin: 0; font-size: 20px; }
+.planner-feedback { font-size: 14px; }
+.planner-feedback summary { cursor: pointer; font-weight: 600; }
+.planning-action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.planning-action-card { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 14px; padding: 18px; border: 1px solid var(--border); border-radius: 10px; }
+.planning-action-card h3 { font-size: 18px; margin: 0 0 8px; }
+.planning-action-card p, .planning-action-card .text-link { font-size: 14px; margin-bottom: 8px; }
+.planning-action-card .btn { margin-top: 12px; font-size: 15px; }
+.action-number { width: 30px; height: 30px; display: grid; place-items: center; background: var(--green-dark); color: white; border-radius: 50%; font-weight: 600; font-size: 15px; }
+.reviewer-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.workspace-tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--border); }
+.workspace-tabs > button { min-height: 46px; padding: 10px 16px; color: var(--green-dark); background: transparent; border-bottom: 3px solid transparent; font-weight: 600; font-size: 15px; }
+.workspace-tabs > button[aria-pressed="true"] { background: var(--bg); border-bottom-color: var(--green-dark); }
+.review-queue-list { display: grid; }
+.review-queue-card { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 22px 0; border-bottom: 1px solid var(--border); }
+.review-queue-marker { color: var(--green); align-self: start; margin-top: 5px; }
+.review-queue-card h3 { font-size: 20px; margin: 4px 0 10px; color: var(--green-dark); }
+.review-queue-card p { font-size: 14px; margin-top: 7px; }
+.review-queue-card .btn { font-size: 15px; padding: 12px 16px; }
+.review-workbench-heading { padding: 22px 28px 0; }
+.review-workbench-heading h2 { font-size: 25px; color: var(--green-dark); margin-bottom: 10px; }
+.review-workbench-heading > p { font-size: 13px; margin-bottom: 10px; }
+.review-comparison-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; padding: 22px 28px; align-items: start; }
+.review-evidence-panel, .review-analysis-panel { min-width: 0; padding: 18px; border: 1px solid var(--border); border-radius: 10px; max-height: 58vh; overflow-y: auto; }
+.review-evidence-panel { background: var(--bg); }
+.review-evidence-panel > .form-stack { margin: 16px 0; }
+.review-evidence-panel .source-full { font: inherit; font-size: 15px; background: transparent; padding: 0; border: 0; }
+.review-evidence-panel .source-reader-controls .btn { font-size: 14px; padding: 9px; }
+.review-source-passages { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 18px; }
+.review-analysis-section { padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--border); }
+.review-analysis-section h4 { font-size: 16px; margin-bottom: 10px; color: var(--green-dark); }
+.review-analysis-section p { font-size: 15px; }
+.dedicated-review-panel { margin: 0 28px 24px; padding: 22px; border: 1px solid var(--border); border-radius: 10px; }
+.review-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.review-identity-note, .review-planning-notice { font-size: 14px; }
+.review-planning-notice { padding: 0 28px 22px; }
+.scheduling-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.schedule-toolbar { display: grid; gap: 16px; }
+.schedule-filter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
+.schedule-filters > summary { cursor: pointer; color: var(--green-dark); font-weight: 600; }
+.schedule-filter-grid .field { font-size: 14px; }
+.schedule-filter-grid select, .schedule-filter-grid input { width: 100%; font-size: 15px; }
+.schedule-date-note { font-size: 13px; }
+.schedule-columns { display: grid; grid-template-columns: minmax(0, 1fr) 245px; gap: 22px; align-items: start; }
+.calendar-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.calendar-heading h2 { font-size: 23px; color: var(--green-dark); margin: 0; }
+.calendar-navigation { display: flex; align-items: center; gap: 7px; }
+.calendar-navigation > .icon-btn { min-width: 44px; min-height: 44px; border: 1px solid var(--border); border-radius: 7px; }
+.calendar-navigation > .btn { padding: 8px 12px; font-size: 14px; }
+.calendar-weekdays, .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.calendar-weekdays { margin-bottom: 8px; color: var(--muted); text-align: center; font-size: 13px; }
+.calendar-day { min-height: 72px; display: flex; align-items: flex-start; flex-direction: column; gap: 8px; padding: 9px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 15px; }
+.calendar-day strong { font-size: 12px; font-weight: 600; }
+.calendar-day.is-today { outline: 2px solid var(--green); outline-offset: -2px; }
+.calendar-day.selected { color: white; background: var(--green-dark); }
+.calendar-day:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+.schedule-agenda h2 { margin: 0 0 16px; font-size: 22px; }
+.schedule-agenda h3 { font-size: 17px; }
+.schedule-agenda > section + section { margin-top: 22px; }
+.agenda-task { display: grid; gap: 5px; padding: 12px 0; border-bottom: 1px solid var(--border); text-align: left; background: transparent; width: 100%; }
+.agenda-task strong { font-size: 15px; }
+.agenda-task span { font-size: 13px; }
+.schedule-agenda .workspace-empty { font-size: 14px; }
+.schedule-task-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.schedule-task-grid .employee-task-card { padding: 18px; }
+.schedule-task-grid .employee-task-card h3 { font-size: 18px; }
+.schedule-task-grid .employee-task-card p, .schedule-task-grid .employee-task-card label { font-size: 14px; }
+.schedule-task-grid .employee-task-card select { font-size: 15px; }
+@media(max-width:1150px) {
+  .planner-columns { grid-template-columns: 1fr; }
+  .planner-overview { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .planner-overview h2, .planner-overview > a { grid-column: 1 / -1; }
+  .schedule-columns { grid-template-columns: 1fr; }
+  .schedule-agenda { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .schedule-agenda h2 { grid-column: 1 / -1; }
+  .schedule-agenda > section + section { margin-top: 0; }
+}
+@media(max-width:700px) {
+  .role-page-heading { flex-direction: column; }
+  .workspace-panel { padding: 16px; }
+  .planner-policy-grid, .planning-action-grid, .schedule-task-grid, .review-comparison-grid, .review-form-grid { grid-template-columns: 1fr; }
+  .scheduling-metrics, .reviewer-metrics, .planner-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .workspace-metric { padding: 14px; gap: 8px; }
+  .workspace-metric strong { font-size: 27px; }
+  .workspace-metric span { font-size: 13px; }
+  .workspace-metric > svg { width: 18px; }
+  .review-queue-card { grid-template-columns: 24px minmax(0, 1fr); gap: 12px; }
+  .review-queue-card > button { grid-column: 1 / -1; }
+  .review-comparison-grid { padding: 18px 16px; }
+  .review-workbench-heading { padding: 18px 16px 0; }
+  .dedicated-review-panel { margin: 0 16px 18px; padding: 16px; }
+  .review-planning-notice { padding: 0 16px 18px; }
+  .review-evidence-panel, .review-analysis-panel { max-height: 460px; }
+  .schedule-filter-grid { grid-template-columns: 1fr 1fr; }
+  .calendar-panel { padding: 12px; }
+  .calendar-day { min-height: 56px; padding: 6px; gap: 4px; }
+  .calendar-task-word { display: none; }
+  .schedule-agenda { grid-template-columns: 1fr; }
+  .calendar-weekdays, .calendar-grid { gap: 3px; }
+  .workspace-actions .btn { flex: 1; }
+}
+@media(max-width:420px) {
+  .workspace-metric > svg { display: none; }
+  .schedule-filter-grid { grid-template-columns: 1fr; }
+  .workspace-tabs > button { flex: 1; padding: 10px 8px; font-size: 14px; }
+}
+.scheduling-dashboard .role-page-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 18px; }
+.scheduling-dashboard .role-page-heading > div { display: contents; }
+.scheduling-dashboard .role-page-heading .workspace-eyebrow, .scheduling-dashboard .role-page-heading h1 { grid-column: 1; }
+.scheduling-dashboard .role-page-heading p { grid-column: 1 / -1; max-width: none; }
+.scheduling-dashboard .role-page-heading > .btn { grid-column: 2; grid-row: 1 / 3; }
+.scheduling-metrics .workspace-metric { padding: 14px 16px; }
+.schedule-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; padding: 16px 20px; }
+.schedule-toolbar .workspace-tabs { flex: 1 1 260px; }
+.schedule-filters[open] { flex-basis: 100%; order: 3; }
+.schedule-date-note { flex-basis: 100%; order: 2; }
+@media(max-width:700px) {
+  .scheduling-dashboard .role-page-heading { grid-template-columns: 1fr; gap: 8px; }
+  .scheduling-dashboard .role-page-heading > .btn { grid-column: 1; grid-row: auto; justify-self: start; }
+  .scheduling-dashboard .role-page-heading p { grid-row: 3; }
+}

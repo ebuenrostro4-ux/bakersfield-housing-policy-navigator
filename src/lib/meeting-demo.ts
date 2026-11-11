@@ -15,6 +15,8 @@ export type DemoPolicy = {
   reviewer: string;
   reviewDate: string;
   comments: string;
+  reviewConcerns?: string;
+  analysisSubmittedAt?: string;
   versions: { number: number; text: string; at: string }[];
   createdAt: string;
   updatedAt: string;

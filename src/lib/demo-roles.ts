@@ -9,28 +9,31 @@ export function demoRole(value: string | null): DemoRole | null {
 }
 export const roleDetails = {
   Planner: {
-    title: "Planner workspace",
+    title: "Planner Workspace",
+    home: "Dashboard",
     description:
-      "Organize policy sources, prepare action plans, and turn recommendations into assigned work.",
+      "Analyze housing policies, understand their impacts, and turn recommendations into action.",
     policies: "Policies",
     analyzer: "Analyze a Policy",
     tasks: "Implementation Tasks",
   },
   Reviewer: {
-    title: "Reviewer workspace",
+    title: "Reviewer Workspace",
+    home: "Review Queue",
     description:
-      "Read source evidence, check sample analyses, and record review notes and unresolved questions.",
-    policies: "Policy Review",
+      "Verify policy analysis, examine supporting evidence, and document review decisions.",
+    policies: "Policy Sources",
     analyzer: "Review Analyses",
     tasks: "Related Tasks",
   },
   Scheduling: {
-    title: "Scheduling workspace",
+    title: "Scheduling Workspace",
+    home: "Dashboard",
     description:
-      "Set staff target dates, coordinate responsible people, and follow upcoming, overdue, and blocked work.",
-    policies: "Policy References",
-    analyzer: "Policy Explanations",
-    tasks: "Schedule & Deadlines",
+      "Coordinate responsibilities, track deadlines, and keep implementation work on schedule.",
+    policies: "Assigned Tasks",
+    analyzer: "Task Management",
+    tasks: "Calendar & Deadlines",
   },
 };
 export function scheduleTasks(tasks: Task[], filter: string, today: string) {
